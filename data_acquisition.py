@@ -3,69 +3,49 @@ import matplotlib.pyplot as plt
 import csv
 import pandas as pd
 import time
-# need autotune environment instead of mlpifa for cst communication
-from test import Controller
+from pifa_controller import MLPIFA
 
+N_SAMPLES = 2000
 
-### Read input data for binary material distribution from input.csv
-## Load data
-csv_input = pd.read_csv('data/input.csv')
-input_data = csv_input.iloc[:, :8].values  # 8 binary inputs [[random1], [random2],...]
+if __name__ == "__main__":
+    mlpifa = MLPIFA("antennas/mlpifa9.cst") # Call mlpifa file
+    # mlpifa.set_environment() # set PIFA and blocks for the first call
+    mlpifa.set_frequency_solver()
+    input_data = mlpifa.generate_input(N_SAMPLES) # generate input.csv randomly, [[feedx, binary seq],...]
+    iter_start = 269 # start data acquisition from sample 'iter_start'
 
-
-### Define CST optimization process for each sample
-def cst_optimization(binary_sequence):
-    binary_sequence = list(binary_sequence)
-
-    ##1 Optimization
-    # open PIFA CST file
-    mlpifa = Controller("mlpifa.cst")
-    # update material distribution
-    mlpifa.update_distribution(binary_sequence)
-    # update initial PIFA parameters
-    pin_pos = 5.0
-    patch_len = 2.0
-    pin_width = 0.5
-    parameters = {pin_pos:5.0, patch_len:2.0, pin_width:0.5}
-    for key, value in parameters.items(): mlpifa.create_parameters(key, value)
-    # run CST optimizer
-    start_time = time.time()
-    end_time = time.time()
-    print("optimization time =", end_time-start_time)
-    # obtain optimized PIFA parameters
-    # obtain optimized PIFA S11 for further verification
-    ##1 Test example for optimization
-    pin_pos = 5.0 + 1.5 * np.sum(binary_sequence) + np.random.rand()*0.5
-    patch_len = 2.0 + 0.5 * np.sum(binary_sequence) + np.random.rand()*0.2
-    pin_width = 0.5 + 0.2 * np.sum(binary_sequence) + np.random.rand()*0.1
-
-    ##2 Record parameters to data.csv
-    output = binary_sequence
-    output.append(pin_pos)
-    output.append(patch_len)
-    output.append(pin_width)
-    with open('data/data.csv', 'a', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(output)
-        print("Input and ouput parameters recorded.")
-
-    return None
-
-
-### Acquire data samples from CST
-## Loop through all n samples and run CST optimizer
-for index in range(len(input_data)):
-    print(f"Sample{index}")
-    cst_optimization(input_data[index])
-## Add csv column name (header) by pandas since we use pandas to read in training code
-df = pd.read_csv('data/data.csv', header=None)
-columns=[f'region{i+1}' for i in range(8)]
-columns.append('pin_pos')
-columns.append('patch_len')
-columns.append('pin_width')
-df.columns = columns
-df.to_csv('data/data.csv', index=False)
-
-
-
-
+for index in range(iter_start, N_SAMPLES): # Loop through all n samples and run CST optimizer
+        mlpifa.delete_results() # clear legacy
+        input_seq = list(input_data[index])
+        print(f"\nSample{index} optimizing...")
+        # Update feedx and blocks material
+        command = ['Sub Main']
+        command += mlpifa.create_parameters('fx', input_seq[0]) # update fx
+        command.append('End Sub')
+        mlpifa.excute_vba(command)
+        mlpifa.update_distribution(input_seq[1:]) # ignore fx in the first index and update blocks material
+        # Optimize
+        mlpifa.set_port()
+        start_time = time.time()
+        mlpifa.optimize() # run CST optimizer
+        end_time = time.time()
+        print("optimization time =", end_time-start_time)
+        print(f"Sample{index} optimized")
+        # Store data into data.csv for training usage
+        mlpifa.update_parameter_dict()
+        data = input_seq
+        for val in mlpifa.parameters.values(): data.append(val)
+        with open('data/data.csv', 'a', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(data)
+            print("Input and ouput parameters stored in data/data.csv")
+        # Obtain optimized S11 for further inspection
+        s11 = mlpifa.read('1D Results\\S-Parameters\\S1,1') # [freq, s11 50+j,...]
+        s11 = np.abs(np.array(s11))
+        s11[:,1] = 20*np.log10(s11[:,1]) # change s11 to dB
+        data = pd.DataFrame(s11[:,:-1], columns=['freq', 's11']) # create a DataFrame
+        data.to_csv(f'data/s11/s11_{index}.csv', index=False) # save to CSV
+        print(f"S11 saved to 'data/s11/s11_{index}.csv'")
+        # Clear legacy for next iteration
+        mlpifa.delete_results()
+        mlpifa.delete_port() # feed postion may change in next iterationeed postion may change in next iteration

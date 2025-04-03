@@ -1,84 +1,218 @@
-import numpy as np
 import pandas as pd
+import numpy as np
 import torch
 import torch.nn as nn
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
-import joblib
+import pickle
+import torch_geometric
+from torch_geometric.nn import GCNConv, GATConv
+import xgboost as xgb
+from tab_transformer_pytorch import TabTransformer
 
-# Load model path
-fnn_path = 'models/fnn_model.pth'
-rf_path = 'models/rf_model.pkl'
+# Load data
+data = pd.read_csv('data/data.csv', header=None)
+X = data.iloc[:, :10].values
+y = data.iloc[:, 10:].values
 
-# Load data (same as training for consistency)
-data = pd.read_csv('data/data.csv')  # region1-8, pin_pos, patch_len, pin_width
-X = data.iloc[:, :8].values  # 8 binary inputs
-y = data.iloc[:, 8:11].values  # 3 outputs
+# Load scalers
+with open('model/scaler_X.pkl', 'rb') as f:
+    scaler_X = pickle.load(f)
+with open('model/scaler_y.pkl', 'rb') as f:
+    scaler_y = pickle.load(f)
 
-# Split (same random_state to match training split)
-_, X_temp, _, y_temp = train_test_split(X, y, test_size=0.3, random_state=42)
-X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, random_state=42)
-X_val, X_test = map(torch.FloatTensor, [X_val, X_test])
-y_val, y_test = map(torch.FloatTensor, [y_val, y_test])
+# Split data
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# FNN Model (must match training architecture)
+# Normalize
+X_test = scaler_X.transform(X_test)
+y_test_orig = y_test  # Keep original for plotting
+y_test = scaler_y.transform(y_test)
+
+# Convert to tensors
+X_test_tensor = torch.FloatTensor(X_test)
+y_test_tensor = torch.FloatTensor(y_test)
+
+# 1. XGBoost
+with open('model/xgb_model.pkl', 'rb') as f:
+    xgb_model = pickle.load(f)
+preds_xgb = xgb_model.predict(X_test)
+preds_xgb_orig = scaler_y.inverse_transform(preds_xgb)
+
+# 2. FNN Model
 class FNN(nn.Module):
     def __init__(self):
         super(FNN, self).__init__()
-        self.net = nn.Sequential(
-            nn.Linear(8, 16), nn.ReLU(),
-            nn.Linear(16, 3)  # 3 outputs
-        )
+        self.fc1 = nn.Linear(10, 8)
+        self.fc2 = nn.Linear(8, 4)
+        self.fc3 = nn.Linear(4, 3)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(0.3)
+
     def forward(self, x):
-        return self.net(x)
+        x = self.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = self.relu(self.fc2(x))
+        x = self.dropout(x)
+        x = self.fc3(x)
+        return x
 
-# Load FNN
-def load_fnn_model(save_path=fnn_path):
-    model = FNN()
-    model.load_state_dict(torch.load(save_path))
-    model.eval()
-    print(f'FNN model loaded from {save_path}')
-    return model
+fnn_model = FNN()
+fnn_model.load_state_dict(torch.load('model/fnn_model.pth'))
+fnn_model.eval()
+with torch.no_grad():
+    preds_fnn = fnn_model(X_test_tensor).numpy()
+preds_fnn_orig = scaler_y.inverse_transform(preds_fnn)
 
-# Load RF
-def load_rf_model(save_path=rf_path):
-    model = joblib.load(save_path)
-    print(f'RF model loaded from {save_path}')
-    return model
+# 3. TabTransformer
+categorical_columns = list(range(1, 10))
+continuous_columns = [0]
+X_test_cat = X_test[:, categorical_columns].astype(int)
+X_test_cont = X_test[:, continuous_columns]
+X_test_cat_tensor = torch.LongTensor(X_test_cat)
+X_test_cont_tensor = torch.FloatTensor(X_test_cont)
 
-# Evaluate
-def evaluate(model, X_test, y_test, model_type='fnn'):
-    if model_type == 'fnn':
-        model.eval()
-        with torch.no_grad():
-            preds = model(X_test)
-    else:
-        preds = torch.FloatTensor(model.predict(X_test.numpy()))
-    mse = mean_squared_error(y_test.numpy(), preds.numpy())
-    return mse, preds
+tab_model = TabTransformer(
+    categories=[2] * 9,
+    num_continuous=1,
+    dim=32,
+    dim_out=3,
+    depth=6,
+    heads=8,
+    attn_dropout=0.1,
+    ff_dropout=0.1,
+    mlp_hidden_mults=(4, 2),
+)
+tab_model.load_state_dict(torch.load('model/tab_model.pth'))
+tab_model.eval()
+with torch.no_grad():
+    preds_tab = tab_model(X_test_cat_tensor, X_test_cont_tensor).numpy()
+preds_tab_orig = scaler_y.inverse_transform(preds_tab)
 
-# Load models
-fnn_loaded = load_fnn_model(fnn_path)
-rf_loaded = load_rf_model(rf_path)
+# 4. GCN Model
+class GCN(torch.nn.Module):
+    def __init__(self):
+        super(GCN, self).__init__()
+        self.conv1 = GCNConv(1, 8)
+        self.conv2 = GCNConv(8, 8)
+        self.fc1 = nn.Linear(8 * 10, 16)
+        self.fc2 = nn.Linear(16, 3)
+        self.relu = nn.ReLU()
 
-# Evaluate loaded models
-mse_fnn, preds_fnn = evaluate(fnn_loaded, X_test, y_test, 'fnn')
-mse_rf, preds_rf = evaluate(rf_loaded, X_test, y_test, 'rf')
-print(f'Loaded FNN MSE: {mse_fnn:.4f}')
-print(f'Loaded RF MSE: {mse_rf:.4f}')
+    def forward(self, data):
+        x, edge_index, edge_attr = data.x, data.edge_index, data.edge_attr
+        x = self.relu(self.conv1(x, edge_index, edge_attr))
+        x = self.relu(self.conv2(x, edge_index, edge_attr))
+        x = x.view(-1, 8 * 10)
+        x = self.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
 
-# Plot all 3 parameters
-for i, param in enumerate(['Pin Position', 'Patch Length', 'Pin Width']):
-    plt.figure()
-    plt.scatter(y_test[:, i], preds_fnn[:, i], label='FNN', alpha=0.6)
-    plt.scatter(y_test[:, i], preds_rf[:, i], label='RF', alpha=0.6)
-    plt.xlabel(f'True {param}')
-    plt.ylabel(f'Predicted {param}')
+# 5. GAT Model
+class GAT(torch.nn.Module):
+    def __init__(self, heads1=4):  # Default to 4 if not specified
+        super(GAT, self).__init__()
+        self.conv1 = GATConv(1, 8, heads=heads1, dropout=0.1)
+        self.conv2 = GATConv(8 * heads1, 8, heads=1, dropout=0.1)
+        self.fc1 = nn.Linear(8 * 10, 16)
+        self.fc2 = nn.Linear(16, 3)
+        self.relu = nn.ReLU()
+
+    def forward(self, data):
+        x, edge_index, edge_attr = data.x, data.edge_index, data.edge_attr
+        x = self.relu(self.conv1(x, edge_index, edge_attr=edge_attr))
+        x = self.relu(self.conv2(x, edge_index, edge_attr=edge_attr))
+        x = x.view(-1, 8 * 10)
+        x = self.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
+
+# Create graph data for GNN
+pec_positions = [(0, 0), (29, 0), (0, 6), (29, 6), (3, 7), (26, 7), (9, 7), (20, 7), (15, 7)]
+def create_graph_data(X):
+    data_list = []
+    for i in range(X.shape[0]):
+        feedx = X[i, 0]
+        feedx_orig = scaler_X.inverse_transform(X[i:i+1])[0, 0]
+        pec_states = X[i, 1:10]
+        node_features = np.concatenate([pec_states, [feedx]])
+        node_features = torch.FloatTensor(node_features).view(-1, 1)
+        positions = pec_positions + [(feedx_orig, 0)]
+        edge_index = []
+        edge_attr = []
+        for j in range(10):
+            for k in range(j + 1, 10):
+                edge_index.append([j, k])
+                edge_index.append([k, j])
+                dx = positions[j][0] - positions[k][0]
+                dy = positions[j][1] - positions[k][1]
+                dist = np.sqrt(dx**2 + dy**2)
+                edge_attr.append(dist)
+                edge_attr.append(dist)
+        edge_index = torch.tensor(edge_index, dtype=torch.long).t()
+        edge_attr = torch.FloatTensor(edge_attr).view(-1, 1)
+        data = torch_geometric.data.Data(
+            x=node_features,
+            edge_index=edge_index,
+            edge_attr=edge_attr
+        )
+        data_list.append(data)
+    return data_list
+
+test_data_list = create_graph_data(X_test)
+
+# Load and evaluate GCN
+gcn_model = GCN()
+gcn_model.load_state_dict(torch.load('model/gcn_model.pth'))
+gcn_model.eval()
+preds_gcn = []
+with torch.no_grad():
+    for data in test_data_list:
+        out = gcn_model(data)
+        preds_gcn.append(out.squeeze(0).numpy())
+preds_gcn = np.array(preds_gcn)
+preds_gcn_orig = scaler_y.inverse_transform(preds_gcn)
+
+# Load and evaluate GAT
+gat_model = GAT()
+gat_model.load_state_dict(torch.load('model/gat_model.pth'))
+gat_model.eval()
+preds_gat = []
+with torch.no_grad():
+    for data in test_data_list:
+        out = gat_model(data)
+        preds_gat.append(out.squeeze(0).numpy())
+preds_gat = np.array(preds_gat)
+preds_gat_orig = scaler_y.inverse_transform(preds_gat)
+
+# Compute MSE for all models (in scaled space)
+models = {'XGBoost': preds_xgb, 'FNN': preds_fnn, 'TabTransformer': preds_tab, 'GCN': preds_gcn, 'GAT': preds_gat}
+for name, preds in models.items():
+    mse = mean_squared_error(y_test, preds)
+    print(f'{name} MSE: {mse:.4f}')
+
+# Compute RMSE in original units (mm)
+models_orig = {'XGBoost': preds_xgb_orig, 'FNN': preds_fnn_orig, 'TabTransformer': preds_tab_orig, 'GCN': preds_gcn_orig, 'GAT': preds_gat_orig}
+for name, preds in models_orig.items():
+    rmse = np.sqrt(mean_squared_error(y_test_orig, preds, multioutput='raw_values'))
+    print(f'{name} RMSE (mm): Pin Distance: {rmse[0]:.4f}, Patch Length: {rmse[1]:.4f}, Pin Width: {rmse[2]:.4f}')
+
+# Plot true vs predicted for each output (in original units)
+param_names = ['Pin Distance', 'Patch Length', 'Pin Width']
+y_test_orig = scaler_y.inverse_transform(y_test)
+for i, param in enumerate(param_names):
+    plt.figure(figsize=(10, 6))
+    for name, preds in models.items():
+        preds_orig = scaler_y.inverse_transform(preds)
+        plt.scatter(y_test_orig[:, i], preds_orig[:, i], label=name, alpha=0.6)
+    min_val = min(y_test_orig[:, i].min(), min(preds_orig[:, i].min() for preds_orig in [scaler_y.inverse_transform(preds) for preds in models.values()]))
+    max_val = max(y_test_orig[:, i].max(), max(preds_orig[:, i].max() for preds_orig in [scaler_y.inverse_transform(preds) for preds in models.values()]))
+    plt.plot([min_val, max_val], [min_val, max_val], 'r--', label='y=x')
+    plt.xlabel(f'True {param} (mm)')
+    plt.ylabel(f'Predicted {param} (mm)')
     plt.legend()
     plt.title(f'True vs Predicted {param}')
-    # Add y=x reference line
-    pmin = min(min(preds_fnn[:, i]), min(preds_rf[:, i]))
-    pmax = max(max(preds_fnn[:, i]), max(preds_rf[:, i]))
-    plt.plot([pmin, pmax], [pmin, pmax], 'g--', label='y=x')  
+    plt.grid(True)
 plt.show()
