@@ -59,11 +59,11 @@ This project uses a predefined environment file (`environment.yml`) to install a
 - Create the environment:
   - **Windows**:
   ```
-  conda env create -f environment.yml
+  conda env create -f environment_win.yml
   ```
   - **Mac/Linux**:
   ```
-  conda env create -f environment.yml
+  conda env create -f environment_mac.yml
   ```
 - Activate the environment:
 ```
