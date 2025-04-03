@@ -54,34 +54,32 @@ cd mlpifa
 ---
 
 ### 4. Set Up the Conda Environment
-This project uses a predefined environment file (`environment.yml`) to install all dependencies.
 
-- Create the environment:
-  - **Windows**:
-  ```
-  conda env create -f environment_win.yml
-  ```
-  - **Mac/Linux**:
-  ```
-  conda env create -f environment_mac.yml
-  ```
+- Create conda environment:
+```
+conda create --name mlpifa
+```
+
 - Activate the environment:
 ```
 conda activate mlpifa
 ```
 
+- Install packages:
+```
+pip install numpy pandas torch torch-geometric scikit-learn xgboost tab-transformer-pytorch optuna matplotlib
+```
+
 ---
 
 ### 5. Run the Code
-For training,
-- Run the script:
+- For training, run the script:
 ```
 python train_and_save.py
 ```
 Hyperparameter optimization would be done by random search and the trained models would be saved to `./model`.
 
-To show and compare the results of the models,
-- Run the script:
+- To show and compare the results of the models, run the script:
 ```
 python load_and_plot.py
 ```
