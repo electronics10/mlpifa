@@ -44,7 +44,7 @@ conda --version
 ### 3. Clone the Repository
 In a terminal or command prompt, navigate to the folder where you want the project and run:
 ```
-git clone https://github.com/electronics10/mlpifa/.git
+git clone https://github.com/electronics10/mlpifa.git
 ```
 Then, enter the project directory:
 ```
