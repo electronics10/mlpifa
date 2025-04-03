@@ -1,6 +1,9 @@
-### Antenna Design Autotuning Concepts by Machine Learning
+### Demonstration of Antenna Autotuning by Machine Learning
 
 # Introduction
+This is a sub-project for antenna design automation. To nearly fully automate the antenna design process subject to basic antenna parameters specifications, please refer to my [main project](https://github.com/electronics10/Topology_Optimization). The computational power and effort are unreal for individual researchers to train a good enough model to replace electromagnetic solver. Thus, work and effort exerted to automate the antenna design by machine learning often result in unuseful or redundant small models that only applies to very specific problems. This project has the same limitation so I decided to focus on autotuning PIFA antenna that operates at 2.45 GHz. The reason is that PIFA antenna is such an easy yet great and commonly used antenna. Although PIFA is such a convenient and well studied antenna design, the surrounding materials, such as the cover or frame of a phone, and the feed point postion may change in different product designs. Therefore, I wish to train a model that can autotune the PIFA antenna parameters according to the surroundings. However, this is a proof of concept project instead of a practical one. 
+
+A tabular data `data\data.csv` would be used to train the model. The dataset is acquired by utilizing CST Studio Suite® optimizer to make sure the parameters setup of all PIFA antenna have S11 from 2.3~2.6 GHz below -10 dB. The acqusition process is automated by the script `data_acqusition.py`, and the software setup is identical to my [main project](https://github.com/electronics10/Topology_Optimization). One can obtain their own data by modifying the script. The dataset is in the form of 13 numbers in each row/sample with 500 samples. The first ten numbers are the input, with the first number representing the x postion of feed point and the remaining represents a binary sequence implying whether there are PEC surrounding blocks at some fixed positions The residual 3 numbers are the output representing the parameters of PIFA antenna shape. A few models are trained on the data and can be compared parallely. To justify the comparison, hyperparameter optimization for each model is performed using random search with 5-fold cross-validation, evaluating 15 trials per model. The best configurations were used to train the final models, ensuring a fair comparison.
 
 ## Prerequisites
 Before running the code, ensure you have the following installed:
@@ -41,11 +44,11 @@ conda --version
 ### 3. Clone the Repository
 In a terminal or command prompt, navigate to the folder where you want the project and run:
 ```
-git clone https://github.com/[YourUsername]/[YourRepoName].git
+git clone https://github.com/electronics10/mlpifa/.git
 ```
 Then, enter the project directory:
 ```
-cd [YourRepoName]
+cd mlpifa
 ```
 
 ---
@@ -54,24 +57,34 @@ cd [YourRepoName]
 This project uses a predefined environment file (`environment.yml`) to install all dependencies.
 
 - Create the environment:
-```
-conda env create -f environment.yml
-```
+  - **Windows**:
+  ```
+  conda env create -f environment.yml
+  ```
+  - **Mac/Linux**:
+  ```
+  conda env create -f environment.yml
+  ```
 - Activate the environment:
 ```
-conda activate [env_name]
+conda activate mlpifa
 ```
-(Replace `[env_name]` with the name specified in `environment.yml`. If unsure, check the first line of the file, e.g., `name: adjoint`.)
 
 ---
 
 ### 5. Run the Code
-[Add specific instructions here based on your project, e.g.:]
-- Run the main script:
+For training,
+- Run the script:
 ```
-python main.py
+python train_and_save.py
 ```
-- Or, if there’s a specific command, include it here.
+Hyperparameter optimization would be done by random search and the trained models would be saved to `./model`.
+
+To show and compare the results of the models,
+- Run the script:
+```
+python load_and_plot.py
+```
 
 ---
 
@@ -80,10 +93,3 @@ python main.py
 - For errors during `conda env create`, ensure you have an active internet connection, as it downloads packages.
 
 ---
-
-### Notes for Your Situation
-1. **Customize the Repository URL**: Replace `[YourUsername]/[YourRepoName]` with your actual GitHub repo URL.
-2. **Environment File**: If you don’t already have an `environment.yml`, create one by running `conda env export > environment.yml` on your machine (while in your project’s Conda environment). Upload this file to your GitHub repo.
-3. **Test the Instructions**: If possible, test these steps on a fresh machine or ask a friend to try them to ensure they’re clear.
-
-Once this README is in your GitHub repo, your colleague can follow it step-by-step. Tell him to open the README on the GitHub page and proceed from there. If he struggles, he can reach out to you with specific errors, and you can guide him further!
