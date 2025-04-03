@@ -11,6 +11,10 @@ from torch_geometric.nn import GCNConv, GATConv
 import xgboost as xgb
 from tab_transformer_pytorch import TabTransformer
 
+# Set device
+device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+print("Using device:", device)
+
 # Load data
 data = pd.read_csv('data/data.csv', header=None)
 X = data.iloc[:, :10].values
@@ -28,12 +32,12 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 
 # Normalize
 X_test = scaler_X.transform(X_test)
-y_test_orig = y_test  # Keep original for plotting
+y_test_orig = y_test
 y_test = scaler_y.transform(y_test)
 
-# Convert to tensors
-X_test_tensor = torch.FloatTensor(X_test)
-y_test_tensor = torch.FloatTensor(y_test)
+# Convert to tensors and move to device
+X_test_tensor = torch.FloatTensor(X_test).to(device)
+y_test_tensor = torch.FloatTensor(y_test).to(device)
 
 # 1. XGBoost
 with open('model/xgb_model.pkl', 'rb') as f:
@@ -43,13 +47,13 @@ preds_xgb_orig = scaler_y.inverse_transform(preds_xgb)
 
 # 2. FNN Model
 class FNN(nn.Module):
-    def __init__(self):
+    def __init__(self, hidden1=8, hidden2=4, dropout_rate=0.3):  # Default values
         super(FNN, self).__init__()
-        self.fc1 = nn.Linear(10, 8)
-        self.fc2 = nn.Linear(8, 4)
-        self.fc3 = nn.Linear(4, 3)
+        self.fc1 = nn.Linear(10, hidden1)
+        self.fc2 = nn.Linear(hidden1, hidden2)
+        self.fc3 = nn.Linear(hidden2, 3)
         self.relu = nn.ReLU()
-        self.dropout = nn.Dropout(0.3)
+        self.dropout = nn.Dropout(dropout_rate)
 
     def forward(self, x):
         x = self.relu(self.fc1(x))
@@ -59,11 +63,12 @@ class FNN(nn.Module):
         x = self.fc3(x)
         return x
 
-fnn_model = FNN()
+# Manually set these based on best_params_fnn from train_and_save.py
+fnn_model = FNN(hidden1=8, hidden2=4, dropout_rate=0.3).to(device)  # Update these values
 fnn_model.load_state_dict(torch.load('model/fnn_model.pth'))
 fnn_model.eval()
 with torch.no_grad():
-    preds_fnn = fnn_model(X_test_tensor).numpy()
+    preds_fnn = fnn_model(X_test_tensor).cpu().numpy()
 preds_fnn_orig = scaler_y.inverse_transform(preds_fnn)
 
 # 3. TabTransformer
@@ -71,24 +76,25 @@ categorical_columns = list(range(1, 10))
 continuous_columns = [0]
 X_test_cat = X_test[:, categorical_columns].astype(int)
 X_test_cont = X_test[:, continuous_columns]
-X_test_cat_tensor = torch.LongTensor(X_test_cat)
-X_test_cont_tensor = torch.FloatTensor(X_test_cont)
+X_test_cat_tensor = torch.LongTensor(X_test_cat).to(device)
+X_test_cont_tensor = torch.FloatTensor(X_test_cont).to(device)
 
+# Manually set these based on best_params_tab from train_and_save.py
 tab_model = TabTransformer(
     categories=[2] * 9,
     num_continuous=1,
-    dim=32,
+    dim=32,  # Update based on best_params_tab['dim']
     dim_out=3,
-    depth=6,
-    heads=8,
+    depth=6,  # Update based on best_params_tab['depth']
+    heads=8,  # Update based on best_params_tab['heads']
     attn_dropout=0.1,
     ff_dropout=0.1,
     mlp_hidden_mults=(4, 2),
-)
+).to(device)
 tab_model.load_state_dict(torch.load('model/tab_model.pth'))
 tab_model.eval()
 with torch.no_grad():
-    preds_tab = tab_model(X_test_cat_tensor, X_test_cont_tensor).numpy()
+    preds_tab = tab_model(X_test_cat_tensor, X_test_cont_tensor).cpu().numpy()
 preds_tab_orig = scaler_y.inverse_transform(preds_tab)
 
 # 4. GCN Model
@@ -112,7 +118,7 @@ class GCN(torch.nn.Module):
 
 # 5. GAT Model
 class GAT(torch.nn.Module):
-    def __init__(self, heads1=4):  # Default to 4 if not specified
+    def __init__(self, heads1=4):  # Update based on best_params_gat['heads1']
         super(GAT, self).__init__()
         self.conv1 = GATConv(1, 8, heads=heads1, dropout=0.1)
         self.conv2 = GATConv(8 * heads1, 8, heads=1, dropout=0.1)
@@ -138,7 +144,7 @@ def create_graph_data(X):
         feedx_orig = scaler_X.inverse_transform(X[i:i+1])[0, 0]
         pec_states = X[i, 1:10]
         node_features = np.concatenate([pec_states, [feedx]])
-        node_features = torch.FloatTensor(node_features).view(-1, 1)
+        node_features = torch.FloatTensor(node_features).view(-1, 1).to(device)
         positions = pec_positions + [(feedx_orig, 0)]
         edge_index = []
         edge_attr = []
@@ -151,8 +157,8 @@ def create_graph_data(X):
                 dist = np.sqrt(dx**2 + dy**2)
                 edge_attr.append(dist)
                 edge_attr.append(dist)
-        edge_index = torch.tensor(edge_index, dtype=torch.long).t()
-        edge_attr = torch.FloatTensor(edge_attr).view(-1, 1)
+        edge_index = torch.tensor(edge_index, dtype=torch.long).t().to(device)
+        edge_attr = torch.FloatTensor(edge_attr).view(-1, 1).to(device)
         data = torch_geometric.data.Data(
             x=node_features,
             edge_index=edge_index,
@@ -164,26 +170,26 @@ def create_graph_data(X):
 test_data_list = create_graph_data(X_test)
 
 # Load and evaluate GCN
-gcn_model = GCN()
+gcn_model = GCN().to(device)
 gcn_model.load_state_dict(torch.load('model/gcn_model.pth'))
 gcn_model.eval()
 preds_gcn = []
 with torch.no_grad():
     for data in test_data_list:
         out = gcn_model(data)
-        preds_gcn.append(out.squeeze(0).numpy())
+        preds_gcn.append(out.squeeze(0).cpu().numpy())
 preds_gcn = np.array(preds_gcn)
 preds_gcn_orig = scaler_y.inverse_transform(preds_gcn)
 
 # Load and evaluate GAT
-gat_model = GAT()
+gat_model = GAT(heads1=4).to(device)  # Update based on best_params_gat['heads1']
 gat_model.load_state_dict(torch.load('model/gat_model.pth'))
 gat_model.eval()
 preds_gat = []
 with torch.no_grad():
     for data in test_data_list:
         out = gat_model(data)
-        preds_gat.append(out.squeeze(0).numpy())
+        preds_gat.append(out.squeeze(0).cpu().numpy())
 preds_gat = np.array(preds_gat)
 preds_gat_orig = scaler_y.inverse_transform(preds_gat)
 
