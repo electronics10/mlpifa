@@ -55,19 +55,22 @@ cd mlpifa
 
 ### 4. Set Up the Conda Environment
 
-- Create conda environment:
-```
-conda create --name mlpifa
-```
+This project uses a predefined environment file (environment.yml) to install all dependencies.
+
+- Create the environment:
+  - **Windows**:
+  ```
+  conda env create -f environment_win.yml
+  ```
+
+  - **Mac**:
+  ```
+  conda env create -f environment_mac.yml
+  ```
 
 - Activate the environment:
 ```
 conda activate mlpifa
-```
-
-- Install packages:
-```
-pip install numpy pandas torch torch-geometric scikit-learn xgboost tab-transformer-pytorch optuna matplotlib
 ```
 
 ---
