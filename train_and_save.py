@@ -16,6 +16,10 @@ import optuna
 torch.manual_seed(42)
 np.random.seed(42)
 
+# Set device
+device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+print("Using device:", device)
+
 # Load data
 data = pd.read_csv('data/data.csv', header=None)
 X = data.iloc[:, :10].values
@@ -38,11 +42,11 @@ with open('model/scaler_X.pkl', 'wb') as f:
 with open('model/scaler_y.pkl', 'wb') as f:
     pickle.dump(scaler_y, f)
 
-# Convert to torch tensors
-X_train_tensor = torch.FloatTensor(X_train)
-X_test_tensor = torch.FloatTensor(X_test)
-y_train_tensor = torch.FloatTensor(y_train)
-y_test_tensor = torch.FloatTensor(y_test)
+# Convert to torch tensors and move to device
+X_train_tensor = torch.FloatTensor(X_train).to(device)
+X_test_tensor = torch.FloatTensor(X_test).to(device)
+y_train_tensor = torch.FloatTensor(y_train).to(device)
+y_test_tensor = torch.FloatTensor(y_test).to(device)
 
 # Prepare data for TabTransformer
 categorical_columns = list(range(1, 10))
@@ -52,10 +56,10 @@ X_test_cat = X_test[:, categorical_columns].astype(int)
 X_train_cont = X_train[:, continuous_columns]
 X_test_cont = X_test[:, continuous_columns]
 
-X_train_cat_tensor = torch.LongTensor(X_train_cat)
-X_test_cat_tensor = torch.LongTensor(X_test_cat)
-X_train_cont_tensor = torch.FloatTensor(X_train_cont)
-X_test_cont_tensor = torch.FloatTensor(X_test_cont)
+X_train_cat_tensor = torch.LongTensor(X_train_cat).to(device)
+X_test_cat_tensor = torch.LongTensor(X_test_cat).to(device)
+X_train_cont_tensor = torch.FloatTensor(X_train_cont).to(device)
+X_test_cont_tensor = torch.FloatTensor(X_test_cont).to(device)
 
 # Create graph data for GNN
 pec_positions = [(0, 0), (29, 0), (0, 6), (29, 6), (3, 7), (26, 7), (9, 7), (20, 7), (15, 7)]
@@ -67,7 +71,7 @@ def create_graph_data(X):
         feedx_orig = scaler_X.inverse_transform(X[i:i+1])[0, 0]
         pec_states = X[i, 1:10]
         node_features = np.concatenate([pec_states, [feedx]])
-        node_features = torch.FloatTensor(node_features).view(-1, 1)
+        node_features = torch.FloatTensor(node_features).view(-1, 1).to(device)
         positions = pec_positions + [(feedx_orig, 0)]
         edge_index = []
         edge_attr = []
@@ -80,8 +84,8 @@ def create_graph_data(X):
                 dist = np.sqrt(dx**2 + dy**2)
                 edge_attr.append(dist)
                 edge_attr.append(dist)
-        edge_index = torch.tensor(edge_index, dtype=torch.long).t()
-        edge_attr = torch.FloatTensor(edge_attr).view(-1, 1)
+        edge_index = torch.tensor(edge_index, dtype=torch.long).t().to(device)
+        edge_attr = torch.FloatTensor(edge_attr).view(-1, 1).to(device)
         data = torch_geometric.data.Data(
             x=node_features,
             edge_index=edge_index,
@@ -105,7 +109,7 @@ def objective_xgb(trial):
     mse_scores = []
     for train_idx, val_idx in kf.split(X_train):
         X_tr, X_val = X_train[train_idx], X_train[val_idx]
-        y_tr, y_val = y_train[train_idx], y_train[val_idx]
+        y_tr, y_val = y_train[train_idx], y_train[val_idx]  # Fixed typo here
         model = xgb.XGBRegressor(**params)
         model.fit(X_tr, y_tr)
         preds = model.predict(X_val)
@@ -157,7 +161,7 @@ def objective_fnn(trial):
         y_tr = y_train_tensor[train_idx]
         y_val = y_train_tensor[val_idx]
 
-        model = FNN(hidden1, hidden2, dropout_rate)
+        model = FNN(hidden1, hidden2, dropout_rate).to(device)
         criterion = nn.MSELoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
@@ -180,7 +184,7 @@ best_params_fnn = study_fnn.best_params
 print("Best FNN params:", best_params_fnn)
 
 # Train FNN with best params
-fnn_model = FNN(best_params_fnn['hidden1'], best_params_fnn['hidden2'], best_params_fnn['dropout_rate'])
+fnn_model = FNN(best_params_fnn['hidden1'], best_params_fnn['hidden2'], best_params_fnn['dropout_rate']).to(device)
 optimizer = torch.optim.Adam(fnn_model.parameters(), lr=best_params_fnn['lr'], weight_decay=best_params_fnn['weight_decay'])
 criterion = nn.MSELoss()
 
@@ -224,7 +228,7 @@ def objective_tab(trial):
             attn_dropout=0.1,
             ff_dropout=0.1,
             mlp_hidden_mults=(4, 2),
-        )
+        ).to(device)
         criterion = nn.MSELoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
@@ -257,7 +261,7 @@ tab_model = TabTransformer(
     attn_dropout=0.1,
     ff_dropout=0.1,
     mlp_hidden_mults=(4, 2),
-)
+).to(device)
 optimizer = torch.optim.Adam(tab_model.parameters(), lr=best_params_tab['lr'])
 criterion = nn.MSELoss()
 
@@ -294,7 +298,7 @@ class GCN(nn.Module):
 
 def objective_gcn(trial):
     lr = trial.suggest_float('lr', 0.001, 0.01, log=True)
-    weight_decay = trial.suggest_float('weight_decay', 0, 1e-4, log=True)
+    weight_decay = trial.suggest_float('weight_decay', 1e-8, 1e-4, log=True)
 
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
     mse_scores = []
@@ -304,7 +308,7 @@ def objective_gcn(trial):
         y_tr = y_train_tensor[train_idx]
         y_val = y_train_tensor[val_idx]
 
-        model = GCN()
+        model = GCN().to(device)
         criterion = nn.MSELoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
@@ -335,7 +339,7 @@ best_params_gcn = study_gcn.best_params
 print("Best GCN params:", best_params_gcn)
 
 # Train GCN with best params
-gcn_model = GCN()
+gcn_model = GCN().to(device)
 optimizer = torch.optim.Adam(gcn_model.parameters(), lr=best_params_gcn['lr'], weight_decay=best_params_gcn['weight_decay'])
 criterion = nn.MSELoss()
 
@@ -351,7 +355,7 @@ for epoch in range(500):
         optimizer.step()
         total_loss += loss.item()
         if epoch % 100 == 0 and i == 0:
-            print(f"GCN Epoch [{epoch+1}/500], Sample 0 Predictions: {out.detach().numpy()}")
+            print(f"GCN Epoch [{epoch+1}/500], Sample 0 Predictions: {out.detach().cpu().numpy()}")
     if (epoch + 1) % 100 == 0:
         print(f'GCN Epoch [{epoch+1}/500], Loss: {total_loss/len(train_data_list):.4f}')
 
@@ -379,7 +383,7 @@ class GAT(nn.Module):
 
 def objective_gat(trial):
     lr = trial.suggest_float('lr', 0.001, 0.01, log=True)
-    weight_decay = trial.suggest_float('weight_decay', 0, 1e-4, log=True)
+    weight_decay = trial.suggest_float('weight_decay', 1e-8, 1e-4, log=True)
     heads1 = trial.suggest_categorical('heads1', [4, 8])
 
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
@@ -390,7 +394,7 @@ def objective_gat(trial):
         y_tr = y_train_tensor[train_idx]
         y_val = y_train_tensor[val_idx]
 
-        model = GAT(heads1)
+        model = GAT(heads1).to(device)
         criterion = nn.MSELoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
@@ -421,7 +425,7 @@ best_params_gat = study_gat.best_params
 print("Best GAT params:", best_params_gat)
 
 # Train GAT with best params
-gat_model = GAT(best_params_gat['heads1'])
+gat_model = GAT(best_params_gat['heads1']).to(device)
 optimizer = torch.optim.Adam(gat_model.parameters(), lr=best_params_gat['lr'], weight_decay=best_params_gat['weight_decay'])
 criterion = nn.MSELoss()
 
@@ -437,7 +441,7 @@ for epoch in range(500):
         optimizer.step()
         total_loss += loss.item()
         if epoch % 100 == 0 and i == 0:
-            print(f"GAT Epoch [{epoch+1}/500], Sample 0 Predictions: {out.detach().numpy()}")
+            print(f"GAT Epoch [{epoch+1}/500], Sample 0 Predictions: {out.detach().cpu().numpy()}")
     if (epoch + 1) % 100 == 0:
         print(f'GAT Epoch [{epoch+1}/500], Loss: {total_loss/len(train_data_list):.4f}')
 
