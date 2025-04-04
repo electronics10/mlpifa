@@ -190,8 +190,8 @@ def objective_fnn(trial):
     for train_idx, val_idx in kf.split(X_train):
         train_subset = TensorDataset(X_train_tensor[train_idx], y_train_tensor[train_idx])
         val_subset = TensorDataset(X_train_tensor[val_idx], y_train_tensor[val_idx])
-        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=4)
-        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=4)
+        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=0)
+        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=0)
 
         model = FNN(hidden1, hidden2, dropout_rate).to(device)
         criterion = nn.MSELoss()
@@ -226,7 +226,7 @@ fnn_model = FNN(best_params_fnn['hidden1'], best_params_fnn['hidden2'], best_par
 optimizer = torch.optim.Adam(fnn_model.parameters(), lr=best_params_fnn['lr'], weight_decay=best_params_fnn['weight_decay'])
 criterion = nn.MSELoss()
 
-train_loader = DataLoader(fnn_dataset, batch_size=32, shuffle=True, pin_memory=True, num_workers=4)
+train_loader = DataLoader(fnn_dataset, batch_size=32, shuffle=True, pin_memory=True, num_workers=0)
 for epoch in range(500):
     fnn_model.train()
     total_loss = 0
@@ -261,8 +261,8 @@ def objective_tab(trial):
     for train_idx, val_idx in kf.split(X_train):
         train_subset = TensorDataset(X_train_cat_tensor[train_idx], X_train_cont_tensor[train_idx], y_train_tensor[train_idx])
         val_subset = TensorDataset(X_train_cat_tensor[val_idx], X_train_cont_tensor[val_idx], y_train_tensor[val_idx])
-        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=4)
-        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=4)
+        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=0)
+        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=0)
 
         model = TabTransformer(
             categories=[2] * 9,
@@ -317,7 +317,7 @@ tab_model = TabTransformer(
 optimizer = torch.optim.Adam(tab_model.parameters(), lr=best_params_tab['lr'])
 criterion = nn.MSELoss()
 
-train_loader = DataLoader(tab_dataset, batch_size=32, shuffle=True, pin_memory=True, num_workers=4)
+train_loader = DataLoader(tab_dataset, batch_size=32, shuffle=True, pin_memory=True, num_workers=0)
 for epoch in range(best_params_tab['epochs']):
     tab_model.train()
     total_loss = 0
@@ -371,8 +371,8 @@ def objective_gcn(trial):
         y_val = y_train_tensor[val_idx]
 
         # Create DataLoader for batching
-        train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=4)
-        val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=4)
+        train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=0)
+        val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=0)
 
         model = GCN().to(device)
         criterion = nn.MSELoss()
@@ -413,7 +413,7 @@ gcn_model = GCN().to(device)
 optimizer = torch.optim.Adam(gcn_model.parameters(), lr=best_params_gcn['lr'], weight_decay=best_params_gcn['weight_decay'])
 criterion = nn.MSELoss()
 
-train_loader = DataLoader(train_data_list, batch_size=32, shuffle=True, pin_memory=True, num_workers=4)
+train_loader = DataLoader(train_data_list, batch_size=32, shuffle=True, pin_memory=True, num_workers=0)
 for epoch in range(500):
     gcn_model.train()
     total_loss = 0
@@ -472,8 +472,8 @@ def objective_gat(trial):
         y_tr = y_train_tensor[train_idx]
         y_val = y_train_tensor[val_idx]
 
-        train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=4)
-        val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=4)
+        train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=0)
+        val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=0)
 
         model = GAT(heads1).to(device)
         criterion = nn.MSELoss()
@@ -514,7 +514,7 @@ gat_model = GAT(best_params_gat['heads1']).to(device)
 optimizer = torch.optim.Adam(gat_model.parameters(), lr=best_params_gat['lr'], weight_decay=best_params_gat['weight_decay'])
 criterion = nn.MSELoss()
 
-train_loader = DataLoader(train_data_list, batch_size=32, shuffle=True, pin_memory=True, num_workers=4)
+train_loader = DataLoader(train_data_list, batch_size=32, shuffle=True, pin_memory=True, num_workers=0)
 for epoch in range(500):
     gat_model.train()
     total_loss = 0
