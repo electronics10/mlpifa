@@ -253,7 +253,7 @@ def objective_tab(trial):
     batch_size = 32  # Add batch size hyperparameter
 
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
-    mse(scores = []
+    mse_scores = []
     for train_idx, val_idx in kf.split(X_train):
         train_subset = TensorDataset(X_train_cat_tensor[train_idx], X_train_cont_tensor[train_idx], y_train_tensor[train_idx])
         val_subset = TensorDataset(X_train_cat_tensor[val_idx], X_train_cont_tensor[val_idx], y_train_tensor[val_idx])
