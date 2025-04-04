@@ -1,3 +1,5 @@
+import platform
+import os
 import pandas as pd
 import numpy as np
 import torch
@@ -16,9 +18,23 @@ import optuna
 torch.manual_seed(42)
 np.random.seed(42)
 
+# Device selection function
+def get_device():
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        print(f"Using CUDA device: {torch.cuda.get_device_name(0)}")
+        return device
+    elif platform.system() == "Darwin" and torch.backends.mps.is_available() and torch.backends.mps.is_built():
+        device = torch.device("mps")
+        print("Using MPS device (Apple Silicon GPU)")
+        return device
+    else:
+        device = torch.device("cpu")
+        print("CUDA and MPS not available, falling back to CPU")
+        return device
+
 # Set device
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print("Using device:", device)
+device = get_device()
 
 # Load data
 data = pd.read_csv('data/data.csv', header=None)
@@ -37,16 +53,17 @@ y_train = scaler_y.fit_transform(y_train)
 y_test = scaler_y.transform(y_test)
 
 # Save scalers
+os.makedirs("model", exist_ok=True)
 with open('model/scaler_X.pkl', 'wb') as f:
     pickle.dump(scaler_X, f)
 with open('model/scaler_y.pkl', 'wb') as f:
     pickle.dump(scaler_y, f)
 
-# Convert to torch tensors and move to device
-X_train_tensor = torch.FloatTensor(X_train).to(device)
-X_test_tensor = torch.FloatTensor(X_test).to(device)
-y_train_tensor = torch.FloatTensor(y_train).to(device)
-y_test_tensor = torch.FloatTensor(y_test).to(device)
+# Convert to torch tensors
+X_train_tensor = torch.FloatTensor(X_train)
+X_test_tensor = torch.FloatTensor(X_test)
+y_train_tensor = torch.FloatTensor(y_train)
+y_test_tensor = torch.FloatTensor(y_test)
 
 # Prepare data for TabTransformer
 categorical_columns = list(range(1, 10))
@@ -56,10 +73,10 @@ X_test_cat = X_test[:, categorical_columns].astype(int)
 X_train_cont = X_train[:, continuous_columns]
 X_test_cont = X_test[:, continuous_columns]
 
-X_train_cat_tensor = torch.LongTensor(X_train_cat).to(device)
-X_test_cat_tensor = torch.LongTensor(X_test_cat).to(device)
-X_train_cont_tensor = torch.FloatTensor(X_train_cont).to(device)
-X_test_cont_tensor = torch.FloatTensor(X_test_cont).to(device)
+X_train_cat_tensor = torch.LongTensor(X_train_cat)
+X_test_cat_tensor = torch.LongTensor(X_test_cat)
+X_train_cont_tensor = torch.FloatTensor(X_train_cont)
+X_test_cont_tensor = torch.FloatTensor(X_test_cont)
 
 # Create graph data for GNN
 pec_positions = [(0, 0), (29, 0), (0, 6), (29, 6), (3, 7), (26, 7), (9, 7), (20, 7), (15, 7)]
@@ -71,7 +88,7 @@ def create_graph_data(X):
         feedx_orig = scaler_X.inverse_transform(X[i:i+1])[0, 0]
         pec_states = X[i, 1:10]
         node_features = np.concatenate([pec_states, [feedx]])
-        node_features = torch.FloatTensor(node_features).view(-1, 1).to(device)
+        node_features = torch.FloatTensor(node_features).view(-1, 1)
         positions = pec_positions + [(feedx_orig, 0)]
         edge_index = []
         edge_attr = []
@@ -84,8 +101,8 @@ def create_graph_data(X):
                 dist = np.sqrt(dx**2 + dy**2)
                 edge_attr.append(dist)
                 edge_attr.append(dist)
-        edge_index = torch.tensor(edge_index, dtype=torch.long).t().to(device)
-        edge_attr = torch.FloatTensor(edge_attr).view(-1, 1).to(device)
+        edge_index = torch.tensor(edge_index, dtype=torch.long).t()
+        edge_attr = torch.FloatTensor(edge_attr).view(-1, 1)
         data = torch_geometric.data.Data(
             x=node_features,
             edge_index=edge_index,
@@ -97,185 +114,185 @@ def create_graph_data(X):
 train_data_list = create_graph_data(X_train)
 test_data_list = create_graph_data(X_test)
 
-# 1. XGBoost Hyperparameter Optimization
-def objective_xgb(trial):
-    params = {
-        'n_estimators': trial.suggest_int('n_estimators', 100, 300),
-        'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.1, log=True),
-        'max_depth': trial.suggest_int('max_depth', 3, 7),
-        'random_state': 42
-    }
-    kf = KFold(n_splits=5, shuffle=True, random_state=42)
-    mse_scores = []
-    for train_idx, val_idx in kf.split(X_train):
-        X_tr, X_val = X_train[train_idx], X_train[val_idx]
-        y_tr, y_val = y_train[train_idx], y_train[val_idx]  # Fixed typo here
-        model = xgb.XGBRegressor(**params)
-        model.fit(X_tr, y_tr)
-        preds = model.predict(X_val)
-        mse = mean_squared_error(y_val, preds)
-        mse_scores.append(mse)
-    return np.mean(mse_scores)
+# # 1. XGBoost Hyperparameter Optimization
+# def objective_xgb(trial):
+#     params = {
+#         'n_estimators': trial.suggest_int('n_estimators', 100, 300),
+#         'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.1, log=True),
+#         'max_depth': trial.suggest_int('max_depth', 3, 7),
+#         'random_state': 42
+#     }
+#     kf = KFold(n_splits=5, shuffle=True, random_state=42)
+#     mse_scores = []
+#     for train_idx, val_idx in kf.split(X_train):
+#         X_tr, X_val = X_train[train_idx], X_train[val_idx]
+#         y_tr, y_val = y_train[train_idx], y_train[val_idx]
+#         model = xgb.XGBRegressor(**params)
+#         model.fit(X_tr, y_tr)
+#         preds = model.predict(X_val)
+#         mse = mean_squared_error(y_val, preds)
+#         mse_scores.append(mse)
+#     return np.mean(mse_scores)
 
-study_xgb = optuna.create_study(direction='minimize')
-study_xgb.optimize(objective_xgb, n_trials=15)
-best_params_xgb = study_xgb.best_params
-print("Best XGBoost params:", best_params_xgb)
+# study_xgb = optuna.create_study(direction='minimize')
+# study_xgb.optimize(objective_xgb, n_trials=15)
+# best_params_xgb = study_xgb.best_params
+# print("Best XGBoost params:", best_params_xgb)
 
-# Train XGBoost with best params
-xgb_model = xgb.XGBRegressor(**best_params_xgb, random_state=42)
-xgb_model.fit(X_train, y_train)
-with open('model/xgb_model.pkl', 'wb') as f:
-    pickle.dump(xgb_model, f)
+# # Train XGBoost with best params
+# xgb_model = xgb.XGBRegressor(**best_params_xgb, random_state=42)
+# xgb_model.fit(X_train, y_train)
+# with open('model/xgb_model.pkl', 'wb') as f:
+#     pickle.dump(xgb_model, f)
 
-# 2. FNN Hyperparameter Optimization
-class FNN(nn.Module):
-    def __init__(self, hidden1, hidden2, dropout_rate):
-        super(FNN, self).__init__()
-        self.fc1 = nn.Linear(10, hidden1)
-        self.fc2 = nn.Linear(hidden1, hidden2)
-        self.fc3 = nn.Linear(hidden2, 3)
-        self.relu = nn.ReLU()
-        self.dropout = nn.Dropout(dropout_rate)
+# # 2. FNN Hyperparameter Optimization
+# class FNN(nn.Module):
+#     def __init__(self, hidden1, hidden2, dropout_rate):
+#         super(FNN, self).__init__()
+#         self.fc1 = nn.Linear(10, hidden1)
+#         self.fc2 = nn.Linear(hidden1, hidden2)
+#         self.fc3 = nn.Linear(hidden2, 3)
+#         self.relu = nn.ReLU()
+#         self.dropout = nn.Dropout(dropout_rate)
 
-    def forward(self, x):
-        x = self.relu(self.fc1(x))
-        x = self.dropout(x)
-        x = self.relu(self.fc2(x))
-        x = self.dropout(x)
-        x = self.fc3(x)
-        return x
+#     def forward(self, x):
+#         x = self.relu(self.fc1(x))
+#         x = self.dropout(x)
+#         x = self.relu(self.fc2(x))
+#         x = self.dropout(x)
+#         x = self.fc3(x)
+#         return x
 
-def objective_fnn(trial):
-    hidden1 = trial.suggest_categorical('hidden1', [8, 16])
-    hidden2 = trial.suggest_categorical('hidden2', [4, 8])
-    dropout_rate = trial.suggest_float('dropout_rate', 0.1, 0.5)
-    lr = trial.suggest_float('lr', 0.001, 0.05, log=True)
-    weight_decay = trial.suggest_float('weight_decay', 1e-8, 1e-4, log=True)
+# def objective_fnn(trial):
+#     hidden1 = trial.suggest_categorical('hidden1', [8, 16])
+#     hidden2 = trial.suggest_categorical('hidden2', [4, 8])
+#     dropout_rate = trial.suggest_float('dropout_rate', 0.1, 0.5)
+#     lr = trial.suggest_float('lr', 0.001, 0.05, log=True)
+#     weight_decay = trial.suggest_float('weight_decay', 1e-8, 1e-4, log=True)
 
-    kf = KFold(n_splits=5, shuffle=True, random_state=42)
-    mse_scores = []
-    for train_idx, val_idx in kf.split(X_train):
-        X_tr = X_train_tensor[train_idx]
-        X_val = X_train_tensor[val_idx]
-        y_tr = y_train_tensor[train_idx]
-        y_val = y_train_tensor[val_idx]
+#     kf = KFold(n_splits=5, shuffle=True, random_state=42)
+#     mse_scores = []
+#     for train_idx, val_idx in kf.split(X_train):
+#         X_tr = X_train_tensor[train_idx]
+#         X_val = X_train_tensor[val_idx]
+#         y_tr = y_train_tensor[train_idx]
+#         y_val = y_train_tensor[val_idx]
 
-        model = FNN(hidden1, hidden2, dropout_rate).to(device)
-        criterion = nn.MSELoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+#         model = FNN(hidden1, hidden2, dropout_rate)
+#         criterion = nn.MSELoss()
+#         optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
-        for epoch in range(500):
-            optimizer.zero_grad()
-            outputs = model(X_tr)
-            loss = criterion(outputs, y_tr)
-            loss.backward()
-            optimizer.step()
+#         for epoch in range(500):
+#             optimizer.zero_grad()
+#             outputs = model(X_tr)
+#             loss = criterion(outputs, y_tr)
+#             loss.backward()
+#             optimizer.step()
 
-        with torch.no_grad():
-            preds = model(X_val)
-            mse = criterion(preds, y_val).item()
-            mse_scores.append(mse)
-    return np.mean(mse_scores)
+#         with torch.no_grad():
+#             preds = model(X_val)
+#             mse = criterion(preds, y_val).item()
+#             mse_scores.append(mse)
+#     return np.mean(mse_scores)
 
-study_fnn = optuna.create_study(direction='minimize')
-study_fnn.optimize(objective_fnn, n_trials=15)
-best_params_fnn = study_fnn.best_params
-print("Best FNN params:", best_params_fnn)
+# study_fnn = optuna.create_study(direction='minimize')
+# study_fnn.optimize(objective_fnn, n_trials=15)
+# best_params_fnn = study_fnn.best_params
+# print("Best FNN params:", best_params_fnn)
 
-# Train FNN with best params
-fnn_model = FNN(best_params_fnn['hidden1'], best_params_fnn['hidden2'], best_params_fnn['dropout_rate']).to(device)
-optimizer = torch.optim.Adam(fnn_model.parameters(), lr=best_params_fnn['lr'], weight_decay=best_params_fnn['weight_decay'])
-criterion = nn.MSELoss()
+# # Train FNN with best params
+# fnn_model = FNN(best_params_fnn['hidden1'], best_params_fnn['hidden2'], best_params_fnn['dropout_rate'])
+# optimizer = torch.optim.Adam(fnn_model.parameters(), lr=best_params_fnn['lr'], weight_decay=best_params_fnn['weight_decay'])
+# criterion = nn.MSELoss()
 
-for epoch in range(500):
-    optimizer.zero_grad()
-    outputs = fnn_model(X_train_tensor)
-    loss = criterion(outputs, y_train_tensor)
-    loss.backward()
-    optimizer.step()
-    if (epoch + 1) % 100 == 0:
-        print(f'FNN Epoch [{epoch+1}/500], Loss: {loss.item():.4f}')
+# for epoch in range(500):
+#     optimizer.zero_grad()
+#     outputs = fnn_model(X_train_tensor)
+#     loss = criterion(outputs, y_train_tensor)
+#     loss.backward()
+#     optimizer.step()
+#     if (epoch + 1) % 100 == 0:
+#         print(f'FNN Epoch [{epoch+1}/500], Loss: {loss.item():.4f}')
 
-# Save FNN
-torch.save(fnn_model.state_dict(), 'model/fnn_model.pth')
+# # Save FNN
+# torch.save(fnn_model.state_dict(), 'model/fnn_model.pth')
 
-# 3. TabTransformer Hyperparameter Optimization
-def objective_tab(trial):
-    dim = trial.suggest_categorical('dim', [16, 32, 64])
-    depth = trial.suggest_categorical('depth', [3, 6])
-    heads = trial.suggest_categorical('heads', [4, 8])
-    lr = trial.suggest_float('lr', 0.001, 0.01, log=True)
-    epochs = trial.suggest_categorical('epochs', [500, 1000])
+# # 3. TabTransformer Hyperparameter Optimization
+# def objective_tab(trial):
+#     dim = trial.suggest_categorical('dim', [16, 32, 64])
+#     depth = trial.suggest_categorical('depth', [3, 6])
+#     heads = trial.suggest_categorical('heads', [4, 8])
+#     lr = trial.suggest_float('lr', 0.001, 0.01, log=True)
+#     epochs = trial.suggest_categorical('epochs', [500, 1000])
 
-    kf = KFold(n_splits=5, shuffle=True, random_state=42)
-    mse_scores = []
-    for train_idx, val_idx in kf.split(X_train):
-        X_tr_cat = X_train_cat_tensor[train_idx]
-        X_tr_cont = X_train_cont_tensor[train_idx]
-        X_val_cat = X_train_cat_tensor[val_idx]
-        X_val_cont = X_train_cont_tensor[val_idx]
-        y_tr = y_train_tensor[train_idx]
-        y_val = y_train_tensor[val_idx]
+#     kf = KFold(n_splits=5, shuffle=True, random_state=42)
+#     mse_scores = []
+#     for train_idx, val_idx in kf.split(X_train):
+#         X_tr_cat = X_train_cat_tensor[train_idx]
+#         X_tr_cont = X_train_cont_tensor[train_idx]
+#         X_val_cat = X_train_cat_tensor[val_idx]
+#         X_val_cont = X_train_cont_tensor[val_idx]
+#         y_tr = y_train_tensor[train_idx]
+#         y_val = y_train_tensor[val_idx]
 
-        model = TabTransformer(
-            categories=[2] * 9,
-            num_continuous=1,
-            dim=dim,
-            dim_out=3,
-            depth=depth,
-            heads=heads,
-            attn_dropout=0.1,
-            ff_dropout=0.1,
-            mlp_hidden_mults=(4, 2),
-        ).to(device)
-        criterion = nn.MSELoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+#         model = TabTransformer(
+#             categories=[2] * 9,
+#             num_continuous=1,
+#             dim=dim,
+#             dim_out=3,
+#             depth=depth,
+#             heads=heads,
+#             attn_dropout=0.1,
+#             ff_dropout=0.1,
+#             mlp_hidden_mults=(4, 2),
+#         )
+#         criterion = nn.MSELoss()
+#         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
-        for epoch in range(epochs):
-            optimizer.zero_grad()
-            outputs = model(X_tr_cat, X_tr_cont)
-            loss = criterion(outputs, y_tr)
-            loss.backward()
-            optimizer.step()
+#         for epoch in range(epochs):
+#             optimizer.zero_grad()
+#             outputs = model(X_tr_cat, X_tr_cont)
+#             loss = criterion(outputs, y_tr)
+#             loss.backward()
+#             optimizer.step()
 
-        with torch.no_grad():
-            preds = model(X_val_cat, X_val_cont)
-            mse = criterion(preds, y_val).item()
-            mse_scores.append(mse)
-    return np.mean(mse_scores)
+#         with torch.no_grad():
+#             preds = model(X_val_cat, X_val_cont)
+#             mse = criterion(preds, y_val).item()
+#             mse_scores.append(mse)
+#     return np.mean(mse_scores)
 
-study_tab = optuna.create_study(direction='minimize')
-study_tab.optimize(objective_tab, n_trials=15)
-best_params_tab = study_tab.best_params
-print("Best TabTransformer params:", best_params_tab)
+# study_tab = optuna.create_study(direction='minimize')
+# study_tab.optimize(objective_tab, n_trials=15)
+# best_params_tab = study_tab.best_params
+# print("Best TabTransformer params:", best_params_tab)
 
-# Train TabTransformer with best params
-tab_model = TabTransformer(
-    categories=[2] * 9,
-    num_continuous=1,
-    dim=best_params_tab['dim'],
-    dim_out=3,
-    depth=best_params_tab['depth'],
-    heads=best_params_tab['heads'],
-    attn_dropout=0.1,
-    ff_dropout=0.1,
-    mlp_hidden_mults=(4, 2),
-).to(device)
-optimizer = torch.optim.Adam(tab_model.parameters(), lr=best_params_tab['lr'])
-criterion = nn.MSELoss()
+# # Train TabTransformer with best params
+# tab_model = TabTransformer(
+#     categories=[2] * 9,
+#     num_continuous=1,
+#     dim=best_params_tab['dim'],
+#     dim_out=3,
+#     depth=best_params_tab['depth'],
+#     heads=best_params_tab['heads'],
+#     attn_dropout=0.1,
+#     ff_dropout=0.1,
+#     mlp_hidden_mults=(4, 2),
+# )
+# optimizer = torch.optim.Adam(tab_model.parameters(), lr=best_params_tab['lr'])
+# criterion = nn.MSELoss()
 
-for epoch in range(best_params_tab['epochs']):
-    optimizer.zero_grad()
-    outputs = tab_model(X_train_cat_tensor, X_train_cont_tensor)
-    loss = criterion(outputs, y_train_tensor)
-    loss.backward()
-    optimizer.step()
-    if (epoch + 1) % 100 == 0:
-        print(f'TabTransformer Epoch [{epoch+1}/{best_params_tab["epochs"]}], Loss: {loss.item():.4f}')
+# for epoch in range(best_params_tab['epochs']):
+#     optimizer.zero_grad()
+#     outputs = tab_model(X_train_cat_tensor, X_train_cont_tensor)
+#     loss = criterion(outputs, y_train_tensor)
+#     loss.backward()
+#     optimizer.step()
+#     if (epoch + 1) % 100 == 0:
+#         print(f'TabTransformer Epoch [{epoch+1}/{best_params_tab["epochs"]}], Loss: {loss.item():.4f}')
 
-# Save TabTransformer
-torch.save(tab_model.state_dict(), 'model/tab_model.pth')
+# # Save TabTransformer
+# torch.save(tab_model.state_dict(), 'model/tab_model.pth')
 
 # 4. GCN Hyperparameter Optimization
 class GCN(nn.Module):
@@ -308,7 +325,7 @@ def objective_gcn(trial):
         y_tr = y_train_tensor[train_idx]
         y_val = y_train_tensor[val_idx]
 
-        model = GCN().to(device)
+        model = GCN()
         criterion = nn.MSELoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
@@ -339,7 +356,7 @@ best_params_gcn = study_gcn.best_params
 print("Best GCN params:", best_params_gcn)
 
 # Train GCN with best params
-gcn_model = GCN().to(device)
+gcn_model = GCN()
 optimizer = torch.optim.Adam(gcn_model.parameters(), lr=best_params_gcn['lr'], weight_decay=best_params_gcn['weight_decay'])
 criterion = nn.MSELoss()
 
@@ -355,7 +372,7 @@ for epoch in range(500):
         optimizer.step()
         total_loss += loss.item()
         if epoch % 100 == 0 and i == 0:
-            print(f"GCN Epoch [{epoch+1}/500], Sample 0 Predictions: {out.detach().cpu().numpy()}")
+            print(f"GCN Epoch [{epoch+1}/500], Sample 0 Predictions: {out.detach().numpy()}")
     if (epoch + 1) % 100 == 0:
         print(f'GCN Epoch [{epoch+1}/500], Loss: {total_loss/len(train_data_list):.4f}')
 
@@ -394,7 +411,7 @@ def objective_gat(trial):
         y_tr = y_train_tensor[train_idx]
         y_val = y_train_tensor[val_idx]
 
-        model = GAT(heads1).to(device)
+        model = GAT(heads1)
         criterion = nn.MSELoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
@@ -425,7 +442,7 @@ best_params_gat = study_gat.best_params
 print("Best GAT params:", best_params_gat)
 
 # Train GAT with best params
-gat_model = GAT(best_params_gat['heads1']).to(device)
+gat_model = GAT(best_params_gat['heads1'])
 optimizer = torch.optim.Adam(gat_model.parameters(), lr=best_params_gat['lr'], weight_decay=best_params_gat['weight_decay'])
 criterion = nn.MSELoss()
 
@@ -441,7 +458,7 @@ for epoch in range(500):
         optimizer.step()
         total_loss += loss.item()
         if epoch % 100 == 0 and i == 0:
-            print(f"GAT Epoch [{epoch+1}/500], Sample 0 Predictions: {out.detach().cpu().numpy()}")
+            print(f"GAT Epoch [{epoch+1}/500], Sample 0 Predictions: {out.detach().numpy()}")
     if (epoch + 1) % 100 == 0:
         print(f'GAT Epoch [{epoch+1}/500], Loss: {total_loss/len(train_data_list):.4f}')
 
