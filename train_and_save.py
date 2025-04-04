@@ -61,11 +61,11 @@ with open('model/scaler_X.pkl', 'wb') as f:
 with open('model/scaler_y.pkl', 'wb') as f:
     pickle.dump(scaler_y, f)
 
-# Convert to torch tensors
-X_train_tensor = torch.FloatTensor(X_train)
-X_test_tensor = torch.FloatTensor(X_test)
-y_train_tensor = torch.FloatTensor(y_train)
-y_test_tensor = torch.FloatTensor(y_test)
+# Convert to torch tensors and move to device
+X_train_tensor = torch.FloatTensor(X_train).to(device)
+X_test_tensor = torch.FloatTensor(X_test).to(device)
+y_train_tensor = torch.FloatTensor(y_train).to(device)
+y_test_tensor = torch.FloatTensor(y_test).to(device)
 
 # Prepare data for TabTransformer
 categorical_columns = list(range(1, 10))
@@ -75,10 +75,10 @@ X_test_cat = X_test[:, categorical_columns].astype(int)
 X_train_cont = X_train[:, continuous_columns]
 X_test_cont = X_test[:, continuous_columns]
 
-X_train_cat_tensor = torch.LongTensor(X_train_cat)
-X_test_cat_tensor = torch.LongTensor(X_test_cat)
-X_train_cont_tensor = torch.FloatTensor(X_train_cont)
-X_test_cont_tensor = torch.FloatTensor(X_test_cont)
+X_train_cat_tensor = torch.LongTensor(X_train_cat).to(device)
+X_test_cat_tensor = torch.LongTensor(X_test_cat).to(device)
+X_train_cont_tensor = torch.FloatTensor(X_train_cont).to(device)
+X_test_cont_tensor = torch.FloatTensor(X_test_cont).to(device)
 
 # Create graph data for GNN
 pec_positions = [(0, 0), (29, 0), (0, 6), (29, 6), (3, 7), (26, 7), (9, 7), (20, 7), (15, 7)]
@@ -90,7 +90,7 @@ def create_graph_data(X):
         feedx_orig = scaler_X.inverse_transform(X[i:i+1])[0, 0]
         pec_states = X[i, 1:10]
         node_features = np.concatenate([pec_states, [feedx]])
-        node_features = torch.FloatTensor(node_features).view(-1, 1)
+        node_features = torch.FloatTensor(node_features).view(-1, 1).to(device)  # Move to device
         positions = pec_positions + [(feedx_orig, 0)]
         edge_index = []
         edge_attr = []
@@ -103,8 +103,8 @@ def create_graph_data(X):
                 dist = np.sqrt(dx**2 + dy**2)
                 edge_attr.append(dist)
                 edge_attr.append(dist)
-        edge_index = torch.tensor(edge_index, dtype=torch.long).t()
-        edge_attr = torch.FloatTensor(edge_attr).view(-1, 1)
+        edge_index = torch.tensor(edge_index, dtype=torch.long).t().to(device)  # Move to device
+        edge_attr = torch.FloatTensor(edge_attr).view(-1, 1).to(device)  # Move to device
         data = torch_geometric.data.Data(
             x=node_features,
             edge_index=edge_index,
@@ -122,7 +122,9 @@ def objective_xgb(trial):
         'n_estimators': trial.suggest_int('n_estimators', 100, 300),
         'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.1, log=True),
         'max_depth': trial.suggest_int('max_depth', 3, 7),
-        'random_state': 42
+        'random_state': 42,
+        'tree_method': 'gpu_hist',  # Use GPU for training
+        'predictor': 'gpu_predictor'  # Use GPU for prediction
     }
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
     mse_scores = []
@@ -142,6 +144,8 @@ best_params_xgb = study_xgb.best_params
 print("Best XGBoost params:", best_params_xgb)
 
 # Train XGBoost with best params
+best_params_xgb['tree_method'] = 'gpu_hist'
+best_params_xgb['predictor'] = 'gpu_predictor'
 xgb_model = xgb.XGBRegressor(**best_params_xgb, random_state=42)
 xgb_model.fit(X_train, y_train)
 with open('model/xgb_model.pkl', 'wb') as f:
@@ -182,8 +186,8 @@ def objective_fnn(trial):
     for train_idx, val_idx in kf.split(X_train):
         train_subset = TensorDataset(X_train_tensor[train_idx], y_train_tensor[train_idx])
         val_subset = TensorDataset(X_train_tensor[val_idx], y_train_tensor[val_idx])
-        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
+        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=4)
+        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=4)
 
         model = FNN(hidden1, hidden2, dropout_rate).to(device)
         criterion = nn.MSELoss()
@@ -249,12 +253,12 @@ def objective_tab(trial):
     batch_size = 32  # Add batch size hyperparameter
 
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
-    mse_scores = []
+    mse(scores = []
     for train_idx, val_idx in kf.split(X_train):
         train_subset = TensorDataset(X_train_cat_tensor[train_idx], X_train_cont_tensor[train_idx], y_train_tensor[train_idx])
         val_subset = TensorDataset(X_train_cat_tensor[val_idx], X_train_cont_tensor[val_idx], y_train_tensor[val_idx])
-        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
+        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=4)
+        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=4)
 
         model = TabTransformer(
             categories=[2] * 9,
@@ -341,7 +345,6 @@ class GCN(nn.Module):
         batch = data.batch if hasattr(data, 'batch') else None
         x = self.relu(self.conv1(x, edge_index, edge_attr))
         x = self.relu(self.conv2(x, edge_index, edge_attr))
-        # If batched, x has shape [total_nodes, 8]; need to split into per-graph features
         if batch is not None:
             x = x.view(-1, 8 * 10)  # Reshape for batched graphs
         else:
@@ -364,8 +367,8 @@ def objective_gcn(trial):
         y_val = y_train_tensor[val_idx]
 
         # Create DataLoader for batching
-        train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False)
+        train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=4)
+        val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=4)
 
         model = GCN().to(device)
         criterion = nn.MSELoss()
@@ -374,10 +377,9 @@ def objective_gcn(trial):
         for epoch in range(500):
             model.train()
             for batch in train_loader:
-                batch = batch.to(device)  # Move the entire batch to GPU
+                batch = batch.to(device)  # Already on device, but keep for consistency
                 optimizer.zero_grad()
                 out = model(batch)
-                # Compute loss for the batch
                 batch_indices = batch.batch.unique()
                 target = y_tr[batch_indices]
                 loss = criterion(out, target)
@@ -466,8 +468,8 @@ def objective_gat(trial):
         y_tr = y_train_tensor[train_idx]
         y_val = y_train_tensor[val_idx]
 
-        train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False)
+        train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=4)
+        val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=4)
 
         model = GAT(heads1).to(device)
         criterion = nn.MSELoss()
