@@ -1,3 +1,5 @@
+import platform
+import os
 import pandas as pd
 import numpy as np
 import torch
@@ -11,9 +13,23 @@ from torch_geometric.nn import GCNConv, GATConv
 import xgboost as xgb
 from tab_transformer_pytorch import TabTransformer
 
+# Device selection function
+def get_device():
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        print(f"Using CUDA device: {torch.cuda.get_device_name(0)}")
+        return device
+    elif platform.system() == "Darwin" and torch.backends.mps.is_available() and torch.backends.mps.is_built():
+        device = torch.device("mps")
+        print("Using MPS device (Apple Silicon GPU)")
+        return device
+    else:
+        device = torch.device("cpu")
+        print("CUDA and MPS not available, falling back to CPU")
+        return device
+
 # Set device
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print("Using device:", device)
+device = get_device()
 
 # Load data
 data = pd.read_csv('data/data.csv', header=None)
