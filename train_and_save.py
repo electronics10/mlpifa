@@ -117,7 +117,7 @@ train_data_list = create_graph_data(X_train)
 test_data_list = create_graph_data(X_test)
 
 # 1. XGBoost Hyperparameter Optimization
-device_xgb = 'cuda' if torch.cuda.is_available() else 'cpu'
+device_xgb = 'cpu'  # Explicitly set to CPU to avoid cupy dependency
 print(f"XGBoost will use device: {device_xgb}")
 
 def objective_xgb(trial):
@@ -125,7 +125,8 @@ def objective_xgb(trial):
         'n_estimators': trial.suggest_int('n_estimators', 100, 300),
         'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.1, log=True),
         'max_depth': trial.suggest_int('max_depth', 3, 7),
-        'random_state': 42,
+        'random_state': 42 '
+
         'tree_method': 'hist',
         'device': device_xgb
     }
@@ -136,10 +137,7 @@ def objective_xgb(trial):
         y_tr, y_val = y_train[train_idx], y_train[val_idx]
         model = xgb.XGBRegressor(**params)
         model.fit(X_tr, y_tr)
-
-        # Convert X_val to a PyTorch tensor and move to GPU
-        X_val_tensor = torch.FloatTensor(X_val).to(device)
-        preds = model.predict(X_val_tensor)  # Predict using GPU tensor
+        preds = model.predict(X_val)
         mse = mean_squared_error(y_val, preds)
         mse_scores.append(mse)
     return np.mean(mse_scores)
@@ -153,10 +151,7 @@ print("Best XGBoost params:", best_params_xgb)
 best_params_xgb['tree_method'] = 'hist'
 best_params_xgb['device'] = device_xgb
 xgb_model = xgb.XGBRegressor(**best_params_xgb, random_state=42)
-
-# Convert X_train to a PyTorch tensor and move to GPU for final training
-X_train_tensor = torch.FloatTensor(X_train).to(device)
-xgb_model.fit(X_train_tensor, y_train)  # Fit using GPU tensor
+xgb_model.fit(X_train, y_train)
 with open('model/xgb_model.pkl', 'wb') as f:
     pickle.dump(xgb_model, f)
 
