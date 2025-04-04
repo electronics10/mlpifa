@@ -215,7 +215,7 @@ for i, param in enumerate(param_names):
         plt.scatter(y_test_orig[:, i], preds_orig[:, i], label=name, alpha=0.6)
     min_val = min(y_test_orig[:, i].min(), min(preds_orig[:, i].min() for preds_orig in [scaler_y.inverse_transform(preds) for preds in models.values()]))
     max_val = max(y_test_orig[:, i].max(), max(preds_orig[:, i].max() for preds_orig in [scaler_y.inverse_transform(preds) for preds in models.values()]))
-    plt.plot([min_val, max_val], [min_val, max_val], 'r--', label='y=x')
+    plt.plot([min_val, max_val], [min_val, max_val], 'k--', label='y=x')
     plt.xlabel(f'True {param} (mm)')
     plt.ylabel(f'Predicted {param} (mm)')
     plt.legend()
