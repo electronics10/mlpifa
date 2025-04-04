@@ -12,7 +12,7 @@ import xgboost as xgb
 from tab_transformer_pytorch import TabTransformer
 
 # Set device
-device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
 
 # Load data
