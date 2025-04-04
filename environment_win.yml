@@ -67,8 +67,10 @@ dependencies:
       - sympy==1.13.1
       - tab-transformer-pytorch==0.4.2
       - threadpoolctl==3.6.0
-      - torch==2.6.0
+      - torch==2.6.0+cu126
       - torch-geometric==2.6.1
+      - torchaudio==2.6.0+cu126
+      - torchvision==0.21.0+cu126
       - tqdm==4.67.1
       - typing-extensions==4.13.1
       - tzdata==2025.2
