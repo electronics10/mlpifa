@@ -10,6 +10,8 @@ from sklearn.metrics import mean_squared_error
 import xgboost as xgb
 import torch_geometric
 from torch_geometric.nn import GCNConv, GATConv
+from torch_geometric.loader import DataLoader
+from torch.utils.data import TensorDataset, DataLoader
 import pickle
 from tab_transformer_pytorch import TabTransformer
 import optuna
@@ -163,36 +165,47 @@ class FNN(nn.Module):
         x = self.fc3(x)
         return x
 
+# Create dataset for FNN
+fnn_dataset = TensorDataset(X_train_tensor, y_train_tensor)
+fnn_test_dataset = TensorDataset(X_test_tensor, y_test_tensor)
+
 def objective_fnn(trial):
     hidden1 = trial.suggest_categorical('hidden1', [8, 16])
     hidden2 = trial.suggest_categorical('hidden2', [4, 8])
     dropout_rate = trial.suggest_float('dropout_rate', 0.1, 0.5)
     lr = trial.suggest_float('lr', 0.001, 0.05, log=True)
-    weight_decay = trial.suggest_float('weight_decay', 1e-8, 1e-4, log=True)
+    weight_decay = trial.suggest_float('weight_decay', 0, 1e-4, log=True)
+    batch_size = 32  # Add batch size hyperparameter
 
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
     mse_scores = []
     for train_idx, val_idx in kf.split(X_train):
-        X_tr = X_train_tensor[train_idx]
-        X_val = X_train_tensor[val_idx]
-        y_tr = y_train_tensor[train_idx]
-        y_val = y_train_tensor[val_idx]
+        train_subset = TensorDataset(X_train_tensor[train_idx], y_train_tensor[train_idx])
+        val_subset = TensorDataset(X_train_tensor[val_idx], y_train_tensor[val_idx])
+        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
 
-        model = FNN(hidden1, hidden2, dropout_rate)
+        model = FNN(hidden1, hidden2, dropout_rate).to(device)
         criterion = nn.MSELoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
         for epoch in range(500):
-            optimizer.zero_grad()
-            outputs = model(X_tr)
-            loss = criterion(outputs, y_tr)
-            loss.backward()
-            optimizer.step()
+            model.train()
+            for X_batch, y_batch in train_loader:
+                optimizer.zero_grad()
+                outputs = model(X_batch)
+                loss = criterion(outputs, y_batch)
+                loss.backward()
+                optimizer.step()
 
+        model.eval()
+        total_mse = 0
         with torch.no_grad():
-            preds = model(X_val)
-            mse = criterion(preds, y_val).item()
-            mse_scores.append(mse)
+            for X_batch, y_batch in val_loader:
+                preds = model(X_batch)
+                mse = criterion(preds, y_batch).item()
+                total_mse += mse * len(X_batch)
+        mse_scores.append(total_mse / len(val_subset))
     return np.mean(mse_scores)
 
 study_fnn = optuna.create_study(direction='minimize')
@@ -201,39 +214,47 @@ best_params_fnn = study_fnn.best_params
 print("Best FNN params:", best_params_fnn)
 
 # Train FNN with best params
-fnn_model = FNN(best_params_fnn['hidden1'], best_params_fnn['hidden2'], best_params_fnn['dropout_rate'])
+fnn_model = FNN(best_params_fnn['hidden1'], best_params_fnn['hidden2'], best_params_fnn['dropout_rate']).to(device)
 optimizer = torch.optim.Adam(fnn_model.parameters(), lr=best_params_fnn['lr'], weight_decay=best_params_fnn['weight_decay'])
 criterion = nn.MSELoss()
 
+train_loader = DataLoader(fnn_dataset, batch_size=32, shuffle=True, pin_memory=True, num_workers=4)
 for epoch in range(500):
-    optimizer.zero_grad()
-    outputs = fnn_model(X_train_tensor)
-    loss = criterion(outputs, y_train_tensor)
-    loss.backward()
-    optimizer.step()
+    fnn_model.train()
+    total_loss = 0
+    for X_batch, y_batch in train_loader:
+        optimizer.zero_grad()
+        outputs = fnn_model(X_batch)
+        loss = criterion(outputs, y_batch)
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item() * len(X_batch)
     if (epoch + 1) % 100 == 0:
-        print(f'FNN Epoch [{epoch+1}/500], Loss: {loss.item():.4f}')
+        print(f'FNN Epoch [{epoch+1}/500], Loss: {total_loss/len(fnn_dataset):.4f}')
 
 # Save FNN
 torch.save(fnn_model.state_dict(), 'model/fnn_model.pth')
 
 # 3. TabTransformer Hyperparameter Optimization
+# Create dataset for TabTransformer
+tab_dataset = TensorDataset(X_train_cat_tensor, X_train_cont_tensor, y_train_tensor)
+tab_test_dataset = TensorDataset(X_test_cat_tensor, X_test_cont_tensor, y_test_tensor)
+
 def objective_tab(trial):
     dim = trial.suggest_categorical('dim', [16, 32, 64])
     depth = trial.suggest_categorical('depth', [3, 6])
     heads = trial.suggest_categorical('heads', [4, 8])
     lr = trial.suggest_float('lr', 0.001, 0.01, log=True)
     epochs = trial.suggest_categorical('epochs', [500, 1000])
+    batch_size = 32  # Add batch size hyperparameter
 
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
     mse_scores = []
     for train_idx, val_idx in kf.split(X_train):
-        X_tr_cat = X_train_cat_tensor[train_idx]
-        X_tr_cont = X_train_cont_tensor[train_idx]
-        X_val_cat = X_train_cat_tensor[val_idx]
-        X_val_cont = X_train_cont_tensor[val_idx]
-        y_tr = y_train_tensor[train_idx]
-        y_val = y_train_tensor[val_idx]
+        train_subset = TensorDataset(X_train_cat_tensor[train_idx], X_train_cont_tensor[train_idx], y_train_tensor[train_idx])
+        val_subset = TensorDataset(X_train_cat_tensor[val_idx], X_train_cont_tensor[val_idx], y_train_tensor[val_idx])
+        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
 
         model = TabTransformer(
             categories=[2] * 9,
@@ -245,21 +266,27 @@ def objective_tab(trial):
             attn_dropout=0.1,
             ff_dropout=0.1,
             mlp_hidden_mults=(4, 2),
-        )
+        ).to(device)
         criterion = nn.MSELoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
         for epoch in range(epochs):
-            optimizer.zero_grad()
-            outputs = model(X_tr_cat, X_tr_cont)
-            loss = criterion(outputs, y_tr)
-            loss.backward()
-            optimizer.step()
+            model.train()
+            for X_cat_batch, X_cont_batch, y_batch in train_loader:
+                optimizer.zero_grad()
+                outputs = model(X_cat_batch, X_cont_batch)
+                loss = criterion(outputs, y_batch)
+                loss.backward()
+                optimizer.step()
 
+        model.eval()
+        total_mse = 0
         with torch.no_grad():
-            preds = model(X_val_cat, X_val_cont)
-            mse = criterion(preds, y_val).item()
-            mse_scores.append(mse)
+            for X_cat_batch, X_cont_batch, y_batch in val_loader:
+                preds = model(X_cat_batch, X_cont_batch)
+                mse = criterion(preds, y_batch).item()
+                total_mse += mse * len(X_cat_batch)
+        mse_scores.append(total_mse / len(val_subset))
     return np.mean(mse_scores)
 
 study_tab = optuna.create_study(direction='minimize')
@@ -278,18 +305,23 @@ tab_model = TabTransformer(
     attn_dropout=0.1,
     ff_dropout=0.1,
     mlp_hidden_mults=(4, 2),
-)
+).to(device)
 optimizer = torch.optim.Adam(tab_model.parameters(), lr=best_params_tab['lr'])
 criterion = nn.MSELoss()
 
+train_loader = DataLoader(tab_dataset, batch_size=32, shuffle=True, pin_memory=True, num_workers=4)
 for epoch in range(best_params_tab['epochs']):
-    optimizer.zero_grad()
-    outputs = tab_model(X_train_cat_tensor, X_train_cont_tensor)
-    loss = criterion(outputs, y_train_tensor)
-    loss.backward()
-    optimizer.step()
+    tab_model.train()
+    total_loss = 0
+    for X_cat_batch, X_cont_batch, y_batch in train_loader:
+        optimizer.zero_grad()
+        outputs = tab_model(X_cat_batch, X_cont_batch)
+        loss = criterion(outputs, y_batch)
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item() * len(X_cat_batch)
     if (epoch + 1) % 100 == 0:
-        print(f'TabTransformer Epoch [{epoch+1}/{best_params_tab["epochs"]}], Loss: {loss.item():.4f}')
+        print(f'TabTransformer Epoch [{epoch+1}/{best_params_tab["epochs"]}], Loss: {total_loss/len(tab_dataset):.4f}')
 
 # Save TabTransformer
 torch.save(tab_model.state_dict(), 'model/tab_model.pth')
@@ -306,16 +338,22 @@ class GCN(nn.Module):
 
     def forward(self, data):
         x, edge_index, edge_attr = data.x, data.edge_index, data.edge_attr
+        batch = data.batch if hasattr(data, 'batch') else None
         x = self.relu(self.conv1(x, edge_index, edge_attr))
         x = self.relu(self.conv2(x, edge_index, edge_attr))
-        x = x.view(-1, 8 * 10)
+        # If batched, x has shape [total_nodes, 8]; need to split into per-graph features
+        if batch is not None:
+            x = x.view(-1, 8 * 10)  # Reshape for batched graphs
+        else:
+            x = x.view(-1, 8 * 10)  # Single graph case
         x = self.relu(self.fc1(x))
         x = self.fc2(x)
         return x
 
 def objective_gcn(trial):
     lr = trial.suggest_float('lr', 0.001, 0.01, log=True)
-    weight_decay = trial.suggest_float('weight_decay', 1e-8, 1e-4, log=True)
+    weight_decay = trial.suggest_float('weight_decay', 0, 1e-4, log=True)
+    batch_size = 32  # Add batch size hyperparameter
 
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
     mse_scores = []
@@ -325,16 +363,23 @@ def objective_gcn(trial):
         y_tr = y_train_tensor[train_idx]
         y_val = y_train_tensor[val_idx]
 
-        model = GCN()
+        # Create DataLoader for batching
+        train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False)
+
+        model = GCN().to(device)
         criterion = nn.MSELoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
         for epoch in range(500):
             model.train()
-            for i, data in enumerate(train_data):
+            for batch in train_loader:
+                batch = batch.to(device)  # Move the entire batch to GPU
                 optimizer.zero_grad()
-                out = model(data)
-                target = y_tr[i].unsqueeze(0)
+                out = model(batch)
+                # Compute loss for the batch
+                batch_indices = batch.batch.unique()
+                target = y_tr[batch_indices]
                 loss = criterion(out, target)
                 loss.backward()
                 optimizer.step()
@@ -342,11 +387,13 @@ def objective_gcn(trial):
         model.eval()
         total_mse = 0
         with torch.no_grad():
-            for i, data in enumerate(val_data):
-                out = model(data)
-                target = y_val[i].unsqueeze(0)
+            for batch in val_loader:
+                batch = batch.to(device)
+                out = model(batch)
+                batch_indices = batch.batch.unique()
+                target = y_val[batch_indices]
                 mse = criterion(out, target).item()
-                total_mse += mse
+                total_mse += mse * len(batch_indices)
         mse_scores.append(total_mse / len(val_data))
     return np.mean(mse_scores)
 
@@ -356,23 +403,26 @@ best_params_gcn = study_gcn.best_params
 print("Best GCN params:", best_params_gcn)
 
 # Train GCN with best params
-gcn_model = GCN()
+gcn_model = GCN().to(device)
 optimizer = torch.optim.Adam(gcn_model.parameters(), lr=best_params_gcn['lr'], weight_decay=best_params_gcn['weight_decay'])
 criterion = nn.MSELoss()
 
+train_loader = DataLoader(train_data_list, batch_size=32, shuffle=True, pin_memory=True, num_workers=4)
 for epoch in range(500):
     gcn_model.train()
     total_loss = 0
-    for i, data in enumerate(train_data_list):
+    for batch in train_loader:
+        batch = batch.to(device)
         optimizer.zero_grad()
-        out = gcn_model(data)
-        target = y_train_tensor[i].unsqueeze(0)
+        out = gcn_model(batch)
+        batch_indices = batch.batch.unique()
+        target = y_train_tensor[batch_indices]
         loss = criterion(out, target)
         loss.backward()
         optimizer.step()
-        total_loss += loss.item()
-        if epoch % 100 == 0 and i == 0:
-            print(f"GCN Epoch [{epoch+1}/500], Sample 0 Predictions: {out.detach().numpy()}")
+        total_loss += loss.item() * len(batch_indices)
+        if epoch % 100 == 0 and batch.batch[0].item() == 0:
+            print(f"GCN Epoch [{epoch+1}/500], Sample 0 Predictions: {out[0].detach().cpu().numpy()}")
     if (epoch + 1) % 100 == 0:
         print(f'GCN Epoch [{epoch+1}/500], Loss: {total_loss/len(train_data_list):.4f}')
 
@@ -391,17 +441,22 @@ class GAT(nn.Module):
 
     def forward(self, data):
         x, edge_index, edge_attr = data.x, data.edge_index, data.edge_attr
+        batch = data.batch if hasattr(data, 'batch') else None
         x = self.relu(self.conv1(x, edge_index, edge_attr=edge_attr))
         x = self.relu(self.conv2(x, edge_index, edge_attr=edge_attr))
-        x = x.view(-1, 8 * 10)
+        if batch is not None:
+            x = x.view(-1, 8 * 10)
+        else:
+            x = x.view(-1, 8 * 10)
         x = self.relu(self.fc1(x))
         x = self.fc2(x)
         return x
 
 def objective_gat(trial):
     lr = trial.suggest_float('lr', 0.001, 0.01, log=True)
-    weight_decay = trial.suggest_float('weight_decay', 1e-8, 1e-4, log=True)
+    weight_decay = trial.suggest_float('weight_decay', 0, 1e-4, log=True)
     heads1 = trial.suggest_categorical('heads1', [4, 8])
+    batch_size = 32  # Add batch size hyperparameter
 
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
     mse_scores = []
@@ -411,16 +466,21 @@ def objective_gat(trial):
         y_tr = y_train_tensor[train_idx]
         y_val = y_train_tensor[val_idx]
 
-        model = GAT(heads1)
+        train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False)
+
+        model = GAT(heads1).to(device)
         criterion = nn.MSELoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
         for epoch in range(500):
             model.train()
-            for i, data in enumerate(train_data):
+            for batch in train_loader:
+                batch = batch.to(device)
                 optimizer.zero_grad()
-                out = model(data)
-                target = y_tr[i].unsqueeze(0)
+                out = model(batch)
+                batch_indices = batch.batch.unique()
+                target = y_tr[batch_indices]
                 loss = criterion(out, target)
                 loss.backward()
                 optimizer.step()
@@ -428,11 +488,13 @@ def objective_gat(trial):
         model.eval()
         total_mse = 0
         with torch.no_grad():
-            for i, data in enumerate(val_data):
-                out = model(data)
-                target = y_val[i].unsqueeze(0)
+            for batch in val_loader:
+                batch = batch.to(device)
+                out = model(batch)
+                batch_indices = batch.batch.unique()
+                target = y_val[batch_indices]
                 mse = criterion(out, target).item()
-                total_mse += mse
+                total_mse += mse * len(batch_indices)
         mse_scores.append(total_mse / len(val_data))
     return np.mean(mse_scores)
 
@@ -442,23 +504,26 @@ best_params_gat = study_gat.best_params
 print("Best GAT params:", best_params_gat)
 
 # Train GAT with best params
-gat_model = GAT(best_params_gat['heads1'])
+gat_model = GAT(best_params_gat['heads1']).to(device)
 optimizer = torch.optim.Adam(gat_model.parameters(), lr=best_params_gat['lr'], weight_decay=best_params_gat['weight_decay'])
 criterion = nn.MSELoss()
 
+train_loader = DataLoader(train_data_list, batch_size=32, shuffle=True, pin_memory=True, num_workers=4)
 for epoch in range(500):
     gat_model.train()
     total_loss = 0
-    for i, data in enumerate(train_data_list):
+    for batch in train_loader:
+        batch = batch.to(device)
         optimizer.zero_grad()
-        out = gat_model(data)
-        target = y_train_tensor[i].unsqueeze(0)
+        out = gat_model(batch)
+        batch_indices = batch.batch.unique()
+        target = y_train_tensor[batch_indices]
         loss = criterion(out, target)
         loss.backward()
         optimizer.step()
-        total_loss += loss.item()
-        if epoch % 100 == 0 and i == 0:
-            print(f"GAT Epoch [{epoch+1}/500], Sample 0 Predictions: {out.detach().numpy()}")
+        total_loss += loss.item() * len(batch_indices)
+        if epoch % 100 == 0 and batch.batch[0].item() == 0:
+            print(f"GAT Epoch [{epoch+1}/500], Sample 0 Predictions: {out[0].detach().cpu().numpy()}")
     if (epoch + 1) % 100 == 0:
         print(f'GAT Epoch [{epoch+1}/500], Loss: {total_loss/len(train_data_list):.4f}')
 
