@@ -136,7 +136,10 @@ def objective_xgb(trial):
         y_tr, y_val = y_train[train_idx], y_train[val_idx]
         model = xgb.XGBRegressor(**params)
         model.fit(X_tr, y_tr)
-        preds = model.predict(X_val)
+
+        # Convert X_val to a PyTorch tensor and move to GPU
+        X_val_tensor = torch.FloatTensor(X_val).to(device)
+        preds = model.predict(X_val_tensor)  # Predict using GPU tensor
         mse = mean_squared_error(y_val, preds)
         mse_scores.append(mse)
     return np.mean(mse_scores)
@@ -150,7 +153,10 @@ print("Best XGBoost params:", best_params_xgb)
 best_params_xgb['tree_method'] = 'hist'
 best_params_xgb['device'] = device_xgb
 xgb_model = xgb.XGBRegressor(**best_params_xgb, random_state=42)
-xgb_model.fit(X_train, y_train)
+
+# Convert X_train to a PyTorch tensor and move to GPU for final training
+X_train_tensor = torch.FloatTensor(X_train).to(device)
+xgb_model.fit(X_train_tensor, y_train)  # Fit using GPU tensor
 with open('model/xgb_model.pkl', 'wb') as f:
     pickle.dump(xgb_model, f)
 
