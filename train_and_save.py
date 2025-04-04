@@ -125,7 +125,7 @@ def objective_xgb(trial):
         'n_estimators': trial.suggest_int('n_estimators', 100, 300),
         'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.1, log=True),
         'max_depth': trial.suggest_int('max_depth', 3, 7),
-        'random_state': 42 '
+        'random_state': 42,
 
         'tree_method': 'hist',
         'device': device_xgb
