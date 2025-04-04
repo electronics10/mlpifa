@@ -117,14 +117,17 @@ train_data_list = create_graph_data(X_train)
 test_data_list = create_graph_data(X_test)
 
 # 1. XGBoost Hyperparameter Optimization
+device_xgb = 'cuda' if torch.cuda.is_available() else 'cpu'
+print(f"XGBoost will use device: {device_xgb}")
+
 def objective_xgb(trial):
     params = {
         'n_estimators': trial.suggest_int('n_estimators', 100, 300),
         'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.1, log=True),
         'max_depth': trial.suggest_int('max_depth', 3, 7),
         'random_state': 42,
-        'tree_method': 'gpu_hist',  # Use GPU for training
-        'predictor': 'gpu_predictor'  # Use GPU for prediction
+        'tree_method': 'hist',
+        'device': device_xgb
     }
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
     mse_scores = []
@@ -144,8 +147,8 @@ best_params_xgb = study_xgb.best_params
 print("Best XGBoost params:", best_params_xgb)
 
 # Train XGBoost with best params
-best_params_xgb['tree_method'] = 'gpu_hist'
-best_params_xgb['predictor'] = 'gpu_predictor'
+best_params_xgb['tree_method'] = 'hist'
+best_params_xgb['device'] = device_xgb
 xgb_model = xgb.XGBRegressor(**best_params_xgb, random_state=42)
 xgb_model.fit(X_train, y_train)
 with open('model/xgb_model.pkl', 'wb') as f:
