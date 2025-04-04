@@ -183,7 +183,7 @@ def objective_fnn(trial):
     dropout_rate = trial.suggest_float('dropout_rate', 0.1, 0.5)
     lr = trial.suggest_float('lr', 0.001, 0.05, log=True)
     weight_decay = trial.suggest_float('weight_decay', 1e-8, 1e-4, log=True)
-    batch_size = 128  # Add batch size hyperparameter
+    batch_size = 512  # Add batch size hyperparameter
 
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
     mse_scores = []
@@ -254,7 +254,7 @@ def objective_tab(trial):
     heads = trial.suggest_categorical('heads', [4, 8])
     lr = trial.suggest_float('lr', 0.001, 0.01, log=True)
     epochs = trial.suggest_categorical('epochs', [500, 1000])
-    batch_size = 128  # Add batch size hyperparameter
+    batch_size = 512  # Add batch size hyperparameter
 
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
     mse_scores = []
@@ -360,7 +360,7 @@ class GCN(nn.Module):
 def objective_gcn(trial):
     lr = trial.suggest_float('lr', 0.001, 0.01, log=True)
     weight_decay = trial.suggest_float('weight_decay', 1e-8, 1e-4, log=True)
-    batch_size = 128  # Add batch size hyperparameter
+    batch_size = 512  # Add batch size hyperparameter
 
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
     mse_scores = []
@@ -462,7 +462,7 @@ def objective_gat(trial):
     lr = trial.suggest_float('lr', 0.001, 0.01, log=True)
     weight_decay = trial.suggest_float('weight_decay', 1e-8, 1e-4, log=True)
     heads1 = trial.suggest_categorical('heads1', [4, 8])
-    batch_size = 128  # Add batch size hyperparameter
+    batch_size = 512  # Add batch size hyperparameter
 
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
     mse_scores = []
