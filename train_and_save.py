@@ -427,8 +427,6 @@ for epoch in range(500):
         loss.backward()
         optimizer.step()
         total_loss += loss.item() * len(batch_indices)
-        if epoch % 100 == 0 and batch.batch[0].item() == 0:
-            print(f"GCN Epoch [{epoch+1}/500], Sample 0 Predictions: {out[0].detach().cpu().numpy()}")
     if (epoch + 1) % 100 == 0:
         print(f'GCN Epoch [{epoch+1}/500], Loss: {total_loss/len(train_data_list):.4f}')
 
@@ -528,8 +526,6 @@ for epoch in range(500):
         loss.backward()
         optimizer.step()
         total_loss += loss.item() * len(batch_indices)
-        if epoch % 100 == 0 and batch.batch[0].item() == 0:
-            print(f"GAT Epoch [{epoch+1}/500], Sample 0 Predictions: {out[0].detach().cpu().numpy()}")
     if (epoch + 1) % 100 == 0:
         print(f'GAT Epoch [{epoch+1}/500], Loss: {total_loss/len(train_data_list):.4f}')
 
