@@ -10,7 +10,7 @@ from sklearn.metrics import mean_squared_error
 import xgboost as xgb
 import torch_geometric
 from torch_geometric.nn import GCNConv, GATConv
-from torch_geometric.loader import DataLoader
+from torch_geometric.loader import DataLoader as geoLoader
 from torch.utils.data import TensorDataset, DataLoader
 import pickle
 from tab_transformer_pytorch import TabTransformer
@@ -371,8 +371,8 @@ def objective_gcn(trial):
         y_val = y_train_tensor[val_idx]
 
         # Create DataLoader for batching
-        train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, pin_memory=False, num_workers=0)
-        val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False, pin_memory=False, num_workers=0)
+        train_loader = geoLoader(train_data, batch_size=batch_size, shuffle=True, pin_memory=False, num_workers=0)
+        val_loader = geoLoader(val_data, batch_size=batch_size, shuffle=False, pin_memory=False, num_workers=0)
 
         model = GCN().to(device)
         criterion = nn.MSELoss()
@@ -413,7 +413,7 @@ gcn_model = GCN().to(device)
 optimizer = torch.optim.Adam(gcn_model.parameters(), lr=best_params_gcn['lr'], weight_decay=best_params_gcn['weight_decay'])
 criterion = nn.MSELoss()
 
-train_loader = DataLoader(train_data_list, batch_size=32, shuffle=True, pin_memory=False, num_workers=0)
+train_loader = geoLoader(train_data_list, batch_size=32, shuffle=True, pin_memory=False, num_workers=0)
 for epoch in range(500):
     gcn_model.train()
     total_loss = 0
@@ -472,8 +472,8 @@ def objective_gat(trial):
         y_tr = y_train_tensor[train_idx]
         y_val = y_train_tensor[val_idx]
 
-        train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, pin_memory=False, num_workers=0)
-        val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False, pin_memory=False, num_workers=0)
+        train_loader = geoLoader(train_data, batch_size=batch_size, shuffle=True, pin_memory=False, num_workers=0)
+        val_loader = geoLoader(val_data, batch_size=batch_size, shuffle=False, pin_memory=False, num_workers=0)
 
         model = GAT(heads1).to(device)
         criterion = nn.MSELoss()
@@ -514,7 +514,7 @@ gat_model = GAT(best_params_gat['heads1']).to(device)
 optimizer = torch.optim.Adam(gat_model.parameters(), lr=best_params_gat['lr'], weight_decay=best_params_gat['weight_decay'])
 criterion = nn.MSELoss()
 
-train_loader = DataLoader(train_data_list, batch_size=32, shuffle=True, pin_memory=False, num_workers=0)
+train_loader = geoLoader(train_data_list, batch_size=32, shuffle=True, pin_memory=False, num_workers=0)
 for epoch in range(500):
     gat_model.train()
     total_loss = 0
