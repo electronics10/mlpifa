@@ -268,6 +268,6 @@ for i, param in enumerate(param_names):
     plt.xlabel(f'True {param} (mm)')
     plt.ylabel(f'Predicted {param} (mm)')
     plt.legend()
-    plt.title(f'True vs Predicted {param}')
+    plt.title(f'{param} prediction of {int(NUM_SAMPLES*0.8)} training samples')
     plt.grid(True)
 plt.show()
