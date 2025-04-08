@@ -75,7 +75,7 @@ def save_best_params(model_name, best_params):
         print(f"Error writing to {best_params_file}: {e}")
 
 # Load data
-data = pd.read_csv(f'model{NUM_SAMPLES}/data.csv', header=None)
+data = pd.read_csv('data/data.csv', header=None)
 X = data.iloc[:NUM_SAMPLES, :10].values
 y = data.iloc[:NUM_SAMPLES, 10:].values
 
