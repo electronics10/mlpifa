@@ -50,7 +50,7 @@ device = get_device()
 def save_best_params(model_name, best_params):
     best_params_file = f'model{NUM_SAMPLES}/best_params.json'
     # Ensure the model directory exists
-    os.makedirs("model", exist_ok=True)
+    os.makedirs(f"model{NUM_SAMPLES}", exist_ok=True)
     
     # Load existing parameters if the file exists
     if os.path.exists(best_params_file):
