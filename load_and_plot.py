@@ -16,6 +16,10 @@ from torch_geometric.loader import DataLoader as GeometricDataLoader  # Add for 
 import xgboost as xgb
 from tab_transformer_pytorch import TabTransformer
 
+NUM_SAMPLES = 1500 # Input samples (80%/20%:training/testing)
+PEC_POSITIONS = [(0, 0), (29, 0), (0, 6), (29, 6), (3, 7), (26, 7), (9, 7), (20, 7), (15, 7)] # Surrounding blocks postions
+BATCH_SIZE = 512
+
 # Device selection function
 def get_device():
     if torch.cuda.is_available():
@@ -35,19 +39,19 @@ def get_device():
 device = get_device()
 
 # Load best hyperparameters
-with open('model/best_params.json', 'r') as f:
+with open(f'model{NUM_SAMPLES}/best_params.json', 'r') as f:
     best_params = json.load(f)
 print("Loaded best hyperparameters:", best_params)
 
 # Load data
-data = pd.read_csv('data/data.csv', header=None)
+data = pd.read_csv(f'model{NUM_SAMPLES}/data.csv', header=None)
 X = data.iloc[:, :10].values
 y = data.iloc[:, 10:].values
 
 # Load scalers
-with open('model/scaler_X.pkl', 'rb') as f:
+with open(f'model{NUM_SAMPLES}/scaler_X.pkl', 'rb') as f:
     scaler_X = pickle.load(f)
-with open('model/scaler_y.pkl', 'rb') as f:
+with open(f'model{NUM_SAMPLES}/scaler_y.pkl', 'rb') as f:
     scaler_y = pickle.load(f)
 
 # Split data
@@ -64,7 +68,7 @@ X_test_tensor = torch.FloatTensor(X_test).to(device)
 y_test_tensor = torch.FloatTensor(y_test).to(device)
 
 # 1. XGBoost
-with open('model/xgb_model.pkl', 'rb') as f:
+with open(f'model{NUM_SAMPLES}/xgb_model.pkl', 'rb') as f:
     xgb_model = pickle.load(f)
 preds_xgb = xgb_model.predict(X_test)
 preds_xgb_orig = scaler_y.inverse_transform(preds_xgb)
@@ -94,7 +98,7 @@ fnn_model = FNN(
     hidden2=fnn_params['hidden2'],
     dropout_rate=fnn_params['dropout_rate']
 ).to(device)
-fnn_model.load_state_dict(torch.load('model/fnn_model.pth'))
+fnn_model.load_state_dict(torch.load(f'model{NUM_SAMPLES}/fnn_model.pth'))
 fnn_model.eval()
 with torch.no_grad():
     preds_fnn = fnn_model(X_test_tensor).cpu().numpy()
@@ -121,7 +125,7 @@ tab_model = TabTransformer(
     ff_dropout=0.1,
     mlp_hidden_mults=(4, 2),
 ).to(device)
-tab_model.load_state_dict(torch.load('model/tab_model.pth'))
+tab_model.load_state_dict(torch.load(f'model{NUM_SAMPLES}/tab_model.pth'))
 tab_model.eval()
 with torch.no_grad():
     preds_tab = tab_model(X_test_cat_tensor, X_test_cont_tensor).cpu().numpy()
@@ -174,7 +178,7 @@ class GAT(torch.nn.Module):
         return x
 
 # Create graph data for GNN
-pec_positions = [(0, 0), (29, 0), (0, 6), (29, 6), (3, 7), (26, 7), (9, 7), (20, 7), (15, 7)]
+pec_positions = PEC_POSITIONS
 def create_graph_data(X):
     data_list = []
     for i in range(X.shape[0]):
@@ -209,9 +213,9 @@ test_data_list = create_graph_data(X_test)
 
 # Load and evaluate GCN with batched inference
 gcn_model = GCN().to(device)
-gcn_model.load_state_dict(torch.load('model/gcn_model.pth'))
+gcn_model.load_state_dict(torch.load(f'model{NUM_SAMPLES}/gcn_model.pth'))
 gcn_model.eval()
-test_loader = GeometricDataLoader(test_data_list, batch_size=512, shuffle=False, pin_memory=False, num_workers=0)
+test_loader = GeometricDataLoader(test_data_list, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
 preds_gcn = []
 with torch.no_grad():
     for batch in test_loader:
@@ -225,9 +229,9 @@ preds_gcn_orig = scaler_y.inverse_transform(preds_gcn)
 # Load and evaluate GAT with batched inference
 gat_params = best_params['gat']
 gat_model = GAT(heads1=gat_params['heads1']).to(device)
-gat_model.load_state_dict(torch.load('model/gat_model.pth'))
+gat_model.load_state_dict(torch.load(f'model{NUM_SAMPLES}/gat_model.pth'))
 gat_model.eval()
-test_loader = GeometricDataLoader(test_data_list, batch_size=512, shuffle=False, pin_memory=False, num_workers=0)
+test_loader = GeometricDataLoader(test_data_list, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
 preds_gat = []
 with torch.no_grad():
     for batch in test_loader:
