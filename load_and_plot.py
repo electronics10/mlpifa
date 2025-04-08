@@ -1,3 +1,5 @@
+# load_and_plot.py
+import json  # Add this import for JSON handling
 import platform
 import os
 import pandas as pd
@@ -10,6 +12,7 @@ import matplotlib.pyplot as plt
 import pickle
 import torch_geometric
 from torch_geometric.nn import GCNConv, GATConv
+from torch_geometric.loader import DataLoader as GeometricDataLoader  # Add for batched inference
 import xgboost as xgb
 from tab_transformer_pytorch import TabTransformer
 
@@ -30,6 +33,11 @@ def get_device():
 
 # Set device
 device = get_device()
+
+# Load best hyperparameters
+with open('model/best_params.json', 'r') as f:
+    best_params = json.load(f)
+print("Loaded best hyperparameters:", best_params)
 
 # Load data
 data = pd.read_csv('data/data.csv', header=None)
@@ -63,7 +71,7 @@ preds_xgb_orig = scaler_y.inverse_transform(preds_xgb)
 
 # 2. FNN Model
 class FNN(nn.Module):
-    def __init__(self, hidden1=8, hidden2=4, dropout_rate=0.3):  # Default values
+    def __init__(self, hidden1, hidden2, dropout_rate):
         super(FNN, self).__init__()
         self.fc1 = nn.Linear(10, hidden1)
         self.fc2 = nn.Linear(hidden1, hidden2)
@@ -79,8 +87,13 @@ class FNN(nn.Module):
         x = self.fc3(x)
         return x
 
-# Manually set these based on best_params_fnn from train_and_save.py
-fnn_model = FNN(hidden1=8, hidden2=4, dropout_rate=0.3).to(device)  # Update these values
+# Initialize FNN with best hyperparameters
+fnn_params = best_params['fnn']
+fnn_model = FNN(
+    hidden1=fnn_params['hidden1'],
+    hidden2=fnn_params['hidden2'],
+    dropout_rate=fnn_params['dropout_rate']
+).to(device)
 fnn_model.load_state_dict(torch.load('model/fnn_model.pth'))
 fnn_model.eval()
 with torch.no_grad():
@@ -95,14 +108,15 @@ X_test_cont = X_test[:, continuous_columns]
 X_test_cat_tensor = torch.LongTensor(X_test_cat).to(device)
 X_test_cont_tensor = torch.FloatTensor(X_test_cont).to(device)
 
-# Manually set these based on best_params_tab from train_and_save.py
+# Initialize TabTransformer with best hyperparameters
+tab_params = best_params['tabtransformer']
 tab_model = TabTransformer(
     categories=[2] * 9,
     num_continuous=1,
-    dim=32,  # Update based on best_params_tab['dim']
+    dim=tab_params['dim'],
     dim_out=3,
-    depth=6,  # Update based on best_params_tab['depth']
-    heads=8,  # Update based on best_params_tab['heads']
+    depth=tab_params['depth'],
+    heads=tab_params['heads'],
     attn_dropout=0.1,
     ff_dropout=0.1,
     mlp_hidden_mults=(4, 2),
@@ -125,16 +139,20 @@ class GCN(torch.nn.Module):
 
     def forward(self, data):
         x, edge_index, edge_attr = data.x, data.edge_index, data.edge_attr
+        batch = data.batch if hasattr(data, 'batch') else None
         x = self.relu(self.conv1(x, edge_index, edge_attr))
         x = self.relu(self.conv2(x, edge_index, edge_attr))
-        x = x.view(-1, 8 * 10)
+        if batch is not None:
+            x = x.view(-1, 8 * 10)
+        else:
+            x = x.view(-1, 8 * 10)
         x = self.relu(self.fc1(x))
         x = self.fc2(x)
         return x
 
 # 5. GAT Model
 class GAT(torch.nn.Module):
-    def __init__(self, heads1=4):  # Update based on best_params_gat['heads1']
+    def __init__(self, heads1):
         super(GAT, self).__init__()
         self.conv1 = GATConv(1, 8, heads=heads1, dropout=0.1)
         self.conv2 = GATConv(8 * heads1, 8, heads=1, dropout=0.1)
@@ -144,9 +162,13 @@ class GAT(torch.nn.Module):
 
     def forward(self, data):
         x, edge_index, edge_attr = data.x, data.edge_index, data.edge_attr
+        batch = data.batch if hasattr(data, 'batch') else None
         x = self.relu(self.conv1(x, edge_index, edge_attr=edge_attr))
         x = self.relu(self.conv2(x, edge_index, edge_attr=edge_attr))
-        x = x.view(-1, 8 * 10)
+        if batch is not None:
+            x = x.view(-1, 8 * 10)
+        else:
+            x = x.view(-1, 8 * 10)
         x = self.relu(self.fc1(x))
         x = self.fc2(x)
         return x
@@ -185,28 +207,35 @@ def create_graph_data(X):
 
 test_data_list = create_graph_data(X_test)
 
-# Load and evaluate GCN
+# Load and evaluate GCN with batched inference
 gcn_model = GCN().to(device)
 gcn_model.load_state_dict(torch.load('model/gcn_model.pth'))
 gcn_model.eval()
+test_loader = GeometricDataLoader(test_data_list, batch_size=512, shuffle=False, pin_memory=False, num_workers=0)
 preds_gcn = []
 with torch.no_grad():
-    for data in test_data_list:
-        out = gcn_model(data)
-        preds_gcn.append(out.squeeze(0).cpu().numpy())
-preds_gcn = np.array(preds_gcn)
+    for batch in test_loader:
+        batch = batch.to(device)
+        out = gcn_model(batch)
+        batch_indices = batch.batch.unique()
+        preds_gcn.append(out.cpu().numpy())
+preds_gcn = np.concatenate(preds_gcn, axis=0)
 preds_gcn_orig = scaler_y.inverse_transform(preds_gcn)
 
-# Load and evaluate GAT
-gat_model = GAT(heads1=4).to(device)  # Update based on best_params_gat['heads1']
+# Load and evaluate GAT with batched inference
+gat_params = best_params['gat']
+gat_model = GAT(heads1=gat_params['heads1']).to(device)
 gat_model.load_state_dict(torch.load('model/gat_model.pth'))
 gat_model.eval()
+test_loader = GeometricDataLoader(test_data_list, batch_size=512, shuffle=False, pin_memory=False, num_workers=0)
 preds_gat = []
 with torch.no_grad():
-    for data in test_data_list:
-        out = gat_model(data)
-        preds_gat.append(out.squeeze(0).cpu().numpy())
-preds_gat = np.array(preds_gat)
+    for batch in test_loader:
+        batch = batch.to(device)
+        out = gat_model(batch)
+        batch_indices = batch.batch.unique()
+        preds_gat.append(out.cpu().numpy())
+preds_gat = np.concatenate(preds_gat, axis=0)
 preds_gat_orig = scaler_y.inverse_transform(preds_gat)
 
 # Compute MSE for all models (in scaled space)
