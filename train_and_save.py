@@ -19,6 +19,11 @@ import optuna
 import pickle
 from tab_transformer_pytorch import TabTransformer
 
+
+NUM_SAMPLES = 1500 # Input samples (80%/20%:training/testing)
+PEC_POSITIONS = [(0, 0), (29, 0), (0, 6), (29, 6), (3, 7), (26, 7), (9, 7), (20, 7), (15, 7)] # Surrounding blocks postions
+BATCH_SIZE = 512
+
 # Set random seed for reproducibility
 torch.manual_seed(42)
 np.random.seed(42)
@@ -41,10 +46,38 @@ def get_device():
 # Set device
 device = get_device()
 
+# Helper function to save or update best_params.json
+def save_best_params(model_name, best_params):
+    best_params_file = f'model{NUM_SAMPLES}/best_params.json'
+    # Ensure the model directory exists
+    os.makedirs("model", exist_ok=True)
+    
+    # Load existing parameters if the file exists
+    if os.path.exists(best_params_file):
+        try:
+            with open(best_params_file, 'r') as f:
+                best_params_all = json.load(f)
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"Error reading {best_params_file}: {e}. Starting with an empty dictionary.")
+            best_params_all = {}
+    else:
+        best_params_all = {}
+    
+    # Update with the new model's parameters
+    best_params_all[model_name] = best_params
+    
+    # Save back to the file
+    try:
+        with open(best_params_file, 'w') as f:
+            json.dump(best_params_all, f, indent=4)
+        print(f"Saved {model_name} best hyperparameters to {best_params_file}")
+    except IOError as e:
+        print(f"Error writing to {best_params_file}: {e}")
+
 # Load data
-data = pd.read_csv('data/data.csv', header=None)
-X = data.iloc[:, :10].values
-y = data.iloc[:, 10:].values
+data = pd.read_csv(f'model{NUM_SAMPLES}/data.csv', header=None)
+X = data.iloc[:NUM_SAMPLES, :10].values
+y = data.iloc[:NUM_SAMPLES, 10:].values
 
 # Split data
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -58,10 +91,10 @@ y_train = scaler_y.fit_transform(y_train)
 y_test = scaler_y.transform(y_test)
 
 # Save scalers
-os.makedirs("model", exist_ok=True)
-with open('model/scaler_X.pkl', 'wb') as f:
+os.makedirs(f"model{NUM_SAMPLES}", exist_ok=True)
+with open(f'model{NUM_SAMPLES}/scaler_X.pkl', 'wb') as f:
     pickle.dump(scaler_X, f)
-with open('model/scaler_y.pkl', 'wb') as f:
+with open(f'model{NUM_SAMPLES}/scaler_y.pkl', 'wb') as f:
     pickle.dump(scaler_y, f)
 
 # Convert to torch tensors and move to device
@@ -84,8 +117,7 @@ X_train_cont_tensor = torch.FloatTensor(X_train_cont).to(device)
 X_test_cont_tensor = torch.FloatTensor(X_test_cont).to(device)
 
 # Create graph data for GNN
-pec_positions = [(0, 0), (29, 0), (0, 6), (29, 6), (3, 7), (26, 7), (9, 7), (20, 7), (15, 7)]
-
+pec_positions = PEC_POSITIONS
 def create_graph_data(X):
     data_list = []
     for i in range(X.shape[0]):
@@ -151,15 +183,17 @@ study_xgb = optuna.create_study(direction='minimize')
 study_xgb.optimize(objective_xgb, n_trials=15)
 best_params_xgb = study_xgb.best_params
 print("Best XGBoost params:", best_params_xgb)
-best_params_all['xgboost'] = best_params_xgb  # Store XGBoost params (optional, not needed for inference)
 
 # Train XGBoost with best params
 best_params_xgb['tree_method'] = 'hist'
 best_params_xgb['device'] = device_xgb
 xgb_model = xgb.XGBRegressor(**best_params_xgb, random_state=42)
 xgb_model.fit(X_train, y_train)
-with open('model/xgb_model.pkl', 'wb') as f:
+with open(f'model{NUM_SAMPLES}/xgb_model.pkl', 'wb') as f:
     pickle.dump(xgb_model, f)
+
+# Save XGBoost hyperparameters
+save_best_params('xgboost', best_params_xgb)
 
 # 2. FNN Hyperparameter Optimization
 class FNN(nn.Module):
@@ -189,7 +223,7 @@ def objective_fnn(trial):
     dropout_rate = trial.suggest_float('dropout_rate', 0.1, 0.5)
     lr = trial.suggest_float('lr', 0.001, 0.05, log=True)
     weight_decay = trial.suggest_float('weight_decay', 1e-8, 1e-4, log=True)
-    batch_size = 512  # Adjusted for larger dataset (1700 samples)
+    batch_size = BATCH_SIZE  # Adjusted for larger dataset (1700 samples)
 
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
     mse_scores = []
@@ -233,7 +267,7 @@ fnn_model = FNN(best_params_fnn['hidden1'], best_params_fnn['hidden2'], best_par
 optimizer = torch.optim.Adam(fnn_model.parameters(), lr=best_params_fnn['lr'], weight_decay=best_params_fnn['weight_decay'])
 criterion = nn.MSELoss()
 
-train_loader = DataLoader(fnn_dataset, batch_size=512, shuffle=True, pin_memory=False, num_workers=0)
+train_loader = DataLoader(fnn_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=False, num_workers=0)
 for epoch in range(500):
     fnn_model.train()
     total_loss = 0
@@ -248,7 +282,10 @@ for epoch in range(500):
         print(f'FNN Epoch [{epoch+1}/500], Loss: {total_loss/len(fnn_dataset):.4f}')
 
 # Save FNN
-torch.save(fnn_model.state_dict(), 'model/fnn_model.pth')
+torch.save(fnn_model.state_dict(), f'model{NUM_SAMPLES}/fnn_model.pth')
+
+# Save FNN hyperparameters
+save_best_params('fnn', best_params_fnn)
 
 # 3. TabTransformer Hyperparameter Optimization
 # Create dataset for TabTransformer
@@ -261,7 +298,7 @@ def objective_tab(trial):
     heads = trial.suggest_categorical('heads', [4, 8])
     lr = trial.suggest_float('lr', 0.001, 0.01, log=True)
     epochs = trial.suggest_categorical('epochs', [500, 1000])
-    batch_size = 512  # Adjusted for larger dataset
+    batch_size = BATCH_SIZE  # Adjusted for larger dataset
 
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
     mse_scores = []
@@ -308,7 +345,6 @@ study_tab = optuna.create_study(direction='minimize')
 study_tab.optimize(objective_tab, n_trials=15)
 best_params_tab = study_tab.best_params
 print("Best TabTransformer params:", best_params_tab)
-best_params_all['tabtransformer'] = best_params_tab  # Store TabTransformer params
 
 # Train TabTransformer with best params
 tab_model = TabTransformer(
@@ -325,7 +361,7 @@ tab_model = TabTransformer(
 optimizer = torch.optim.Adam(tab_model.parameters(), lr=best_params_tab['lr'])
 criterion = nn.MSELoss()
 
-train_loader = DataLoader(tab_dataset, batch_size=512, shuffle=True, pin_memory=False, num_workers=0)
+train_loader = DataLoader(tab_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=False, num_workers=0)
 for epoch in range(best_params_tab['epochs']):
     tab_model.train()
     total_loss = 0
@@ -340,7 +376,10 @@ for epoch in range(best_params_tab['epochs']):
         print(f'TabTransformer Epoch [{epoch+1}/{best_params_tab["epochs"]}], Loss: {total_loss/len(tab_dataset):.4f}')
 
 # Save TabTransformer
-torch.save(tab_model.state_dict(), 'model/tab_model.pth')
+torch.save(tab_model.state_dict(), f'model{NUM_SAMPLES}/tab_model.pth')
+
+# Save TabTransformer hyperparameters
+save_best_params('tabtransformer', best_params_tab)
 
 # 4. GCN Hyperparameter Optimization
 class GCN(nn.Module):
@@ -368,7 +407,7 @@ class GCN(nn.Module):
 def objective_gcn(trial):
     lr = trial.suggest_float('lr', 0.001, 0.01, log=True)
     weight_decay = trial.suggest_float('weight_decay', 1e-8, 1e-4, log=True)
-    batch_size = 512  # Adjusted for larger dataset
+    batch_size = BATCH_SIZE  # Adjusted for larger dataset
 
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
     mse_scores = []
@@ -414,14 +453,13 @@ study_gcn = optuna.create_study(direction='minimize')
 study_gcn.optimize(objective_gcn, n_trials=15)
 best_params_gcn = study_gcn.best_params
 print("Best GCN params:", best_params_gcn)
-best_params_all['gcn'] = best_params_gcn  # Store GCN params
 
 # Train GCN with best params
 gcn_model = GCN().to(device)
 optimizer = torch.optim.Adam(gcn_model.parameters(), lr=best_params_gcn['lr'], weight_decay=best_params_gcn['weight_decay'])
 criterion = nn.MSELoss()
 
-train_loader = GeometricDataLoader(train_data_list, batch_size=512, shuffle=True, pin_memory=False, num_workers=0)
+train_loader = GeometricDataLoader(train_data_list, batch_size=BATCH_SIZE, shuffle=True, pin_memory=False, num_workers=0)
 for epoch in range(500):
     gcn_model.train()
     total_loss = 0
@@ -439,7 +477,10 @@ for epoch in range(500):
         print(f'GCN Epoch [{epoch+1}/500], Loss: {total_loss/len(train_data_list):.4f}')
 
 # Save GCN
-torch.save(gcn_model.state_dict(), 'model/gcn_model.pth')
+torch.save(gcn_model.state_dict(), f'model{NUM_SAMPLES}/gcn_model.pth')
+
+# Save GCN hyperparameters
+save_best_params('gcn', best_params_gcn)
 
 # 5. GAT Hyperparameter Optimization
 class GAT(nn.Module):
@@ -468,7 +509,7 @@ def objective_gat(trial):
     lr = trial.suggest_float('lr', 0.001, 0.01, log=True)
     weight_decay = trial.suggest_float('weight_decay', 1e-8, 1e-4, log=True)
     heads1 = trial.suggest_categorical('heads1', [4, 8])
-    batch_size = 512  # Adjusted for larger dataset
+    batch_size = BATCH_SIZE  # Adjusted for larger dataset
 
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
     mse_scores = []
@@ -514,14 +555,13 @@ study_gat = optuna.create_study(direction='minimize')
 study_gat.optimize(objective_gat, n_trials=15)
 best_params_gat = study_gat.best_params
 print("Best GAT params:", best_params_gat)
-best_params_all['gat'] = best_params_gat  # Store GAT params
 
 # Train GAT with best params
 gat_model = GAT(best_params_gat['heads1']).to(device)
 optimizer = torch.optim.Adam(gat_model.parameters(), lr=best_params_gat['lr'], weight_decay=best_params_gat['weight_decay'])
 criterion = nn.MSELoss()
 
-train_loader = GeometricDataLoader(train_data_list, batch_size=512, shuffle=True, pin_memory=False, num_workers=0)
+train_loader = GeometricDataLoader(train_data_list, batch_size=BATCH_SIZE, shuffle=True, pin_memory=False, num_workers=0)
 for epoch in range(500):
     gat_model.train()
     total_loss = 0
@@ -539,9 +579,7 @@ for epoch in range(500):
         print(f'GAT Epoch [{epoch+1}/500], Loss: {total_loss/len(train_data_list):.4f}')
 
 # Save GAT
-torch.save(gat_model.state_dict(), 'model/gat_model.pth')
+torch.save(gat_model.state_dict(), f'model{NUM_SAMPLES}/gat_model.pth')
 
-# Save all best hyperparameters to a JSON file
-with open('model/best_params.json', 'w') as f:
-    json.dump(best_params_all, f, indent=4)
-print("Saved best hyperparameters to 'model/best_params.json'")
+# Save GAT hyperparameters
+save_best_params('gat', best_params_gat)
