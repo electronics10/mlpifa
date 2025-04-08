@@ -44,7 +44,7 @@ with open(f'model{NUM_SAMPLES}/best_params.json', 'r') as f:
 print("Loaded best hyperparameters:", best_params)
 
 # Load data
-data = pd.read_csv(f='data/data.csv', header=None)
+data = pd.read_csv('data/data.csv', header=None)
 X = data.iloc[:NUM_SAMPLES, :10].values
 y = data.iloc[:NUM_SAMPLES, 10:].values
 
