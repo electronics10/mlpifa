@@ -20,10 +20,9 @@ import pickle
 from tab_transformer_pytorch import TabTransformer
 
 
-NUM_SAMPLES = 1500 # Input samples (80%/20%:training/testing)
+NUM_SAMPLES = 2000 # Input samples (80%/20%:training/testing)
 PEC_POSITIONS = [(0, 0), (29, 0), (0, 6), (29, 6), (3, 7), (26, 7), (9, 7), (20, 7), (15, 7)] # Surrounding blocks postions
-if NUM_SAMPLES <= 1000: BATCH_SIZE = 64
-else: BATCH_SIZE = 128
+BATCH_SIZE = 64
 
 # Set random seed for reproducibility
 torch.manual_seed(42)
