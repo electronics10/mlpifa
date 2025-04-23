@@ -10,7 +10,7 @@ FEEDX_MAX = 12
 FEEDX_MIN = 8
 BLOCKS_NUM = 9
 
-SAMPLES = 7
+SAMPLES = 5
 
 # === Load test input data ===
 def generate_input():
