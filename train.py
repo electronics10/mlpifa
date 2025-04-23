@@ -73,18 +73,17 @@ plt.savefig(f'artifacts/loss.png')
 torch.save(model.state_dict(), "artifacts/mlp_model.pt")
 
 # === Predict ===
-os.makedirs("results", exist_ok=True)
 with torch.no_grad():
     y_pred_scaled = model(X_test).numpy()
     y_pred = y_scaler.inverse_transform(y_pred_scaled)
     y_true = y_scaler.inverse_transform(y_test.numpy())
 
 # === Save predictions for review ===
-np.savetxt("results/predictions.csv", np.hstack([y_true, y_pred]), delimiter=",", header="true_1,true_2,true_3,pred_1,pred_2,pred_3", comments="")
+np.savetxt("artifacts/predictions.csv", np.hstack([y_true, y_pred]), delimiter=",", header="true_1,true_2,true_3,pred_1,pred_2,pred_3", comments="")
 
 # === Compute and save test loss ===
 mse = np.mean((y_pred - y_true) ** 2)
-with open("results/test_loss.txt", "w") as f:
+with open("artifacts/test_loss.txt", "w") as f:
     f.write(f"MSE on test set: {mse:.6f}\n")
 
 print(f"Test MSE: {mse:.6f}")
@@ -101,5 +100,5 @@ for i in range(3):
     plt.title(f'{output_labels[i]}: Predicted vs True')
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig(f'results/output_{i+1}_plot.png')
+    plt.savefig(f'artifacts/output_{i+1}_plot.png')
     plt.close()
