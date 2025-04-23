@@ -40,4 +40,5 @@ plt.title("Initial (s) / CST opt. (o) / ML opt. (m)")
 plt.legend()
 plt.grid()
 plt.show()
+plt.savefig('comparison.png')
 
