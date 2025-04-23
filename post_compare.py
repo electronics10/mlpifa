@@ -43,11 +43,11 @@ for index in range(len(predicted_data)): # Loop through all n samples and run CS
         data.to_csv(f'data/s11/s{index}.csv', index=False) # save to CSV
         print(f"S11 saved to 'data/s11/s{index}.csv'")
         # Store data into data.csv for training usage # post
-        data = input_seq
-        for val in mlpifa.parameters.values(): data.append(val)
+        data1 = input_seq
+        for val in mlpifa.parameters.values(): data1.append(val)
         with open('data/data_wo.csv', 'a', newline='') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(data)
+            writer.writerow(data1)
             print("Input and ouput parameters stored in data/data_wo.csv")
         # Clear legacy for optimization # post
         mlpifa.delete_results() # post
@@ -74,11 +74,11 @@ for index in range(len(predicted_data)): # Loop through all n samples and run CS
         data.to_csv(f'data/s11/m{index}.csv', index=False) # save to CSV
         print(f"S11 saved to 'data/s11/m{index}.csv'")
         # Store data into data.csv for training usage # post
-        data1 = input_seq
-        for val in mlpifa.parameters.values(): data1.append(val)
+        data2 = input_seq
+        for val in mlpifa.parameters.values(): data2.append(val)
         with open('data/data_ml.csv', 'a', newline='') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(data1)
+            writer.writerow(data2)
             print("Input and ouput parameters stored in data/data_ml.csv")
         # Clear legacy for optimization # post
         mlpifa.delete_results() # post
@@ -92,14 +92,6 @@ for index in range(len(predicted_data)): # Loop through all n samples and run CS
         end_time = time.time()
         print("optimization time =", end_time-start_time)
         print(f"Sample{index} optimized")
-        # Store data into data.csv for training usage
-        mlpifa.update_parameter_dict()
-        data = input_seq
-        for val in mlpifa.parameters.values(): data.append(val)
-        with open('data/data.csv', 'a', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow(data)
-            print("Input and ouput parameters stored in data/data.csv")
         # Obtain optimized S11 for further inspection
         s11 = mlpifa.read('1D Results\\S-Parameters\\S1,1') # [freq, s11 50+j,...]
         s11 = np.abs(np.array(s11))
@@ -107,6 +99,14 @@ for index in range(len(predicted_data)): # Loop through all n samples and run CS
         data = pd.DataFrame(s11[:,:-1], columns=['freq', 's11']) # create a DataFrame
         data.to_csv(f'data/s11/o{index}.csv', index=False) # save to CSV
         print(f"S11 saved to 'data/s11/o{index}.csv'")
+        # Store data into data.csv for training usage
+            mlpifa.update_parameter_dict()
+            data3 = input_seq
+            for val in mlpifa.parameters.values(): data3.append(val)
+            with open('data/data_CST.csv', 'a', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(data3)
+                print("Input and ouput parameters stored in data/data.csv")
         # Clear legacy for next iteration
         mlpifa.delete_results()
         mlpifa.delete_port() # feed postion may change in next iterationeed postion may change in next iteration
