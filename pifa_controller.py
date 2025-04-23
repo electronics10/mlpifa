@@ -7,6 +7,8 @@ import os
 import numpy as np
 import pandas as pd
  
+N_SAMPLES = 500
+SEED = 42
 
 BLOCKS_NUM = 9
 BLOCK_LEN = 3 # mm
@@ -141,22 +143,19 @@ class MLPIFA(CSTInterface):
         return command
 
     def create_parameters(self,  para_name, para_value): #create or change are the same
-        command = ['StoreDoubleParameter("%s", "%.4f")' % (para_name, para_value),
-                'RebuildOnParametricChange(False, True)']
-        return command
+        command = ['Sub Main', 'StoreDoubleParameter("%s", "%.4f")' % (para_name, para_value),
+                'RebuildOnParametricChange(False, True)', 'End Sub']
+        self.excute_vba(command)
     
     def delete_results(self):
         command = ['Sub Main', 'DeleteResults', 'End Sub']
         self.excute_vba(command)
 
     def set_environment(self):
-        command = ['Sub Main']
         # Initiate parameters
         for name, val in self.parameters.items(): 
-            command += self.create_parameters(name, val)
-        command += self.create_parameters('fx', (self.fx_min+self.fx_max)/2) # create initial fx=11mm
-        command.append('End Sub')
-        self.excute_vba(command)
+            self.create_parameters(name, val)
+        self.create_parameters('fx', (self.fx_min+self.fx_max)/2) # create initial fx=11mm
         print("Parameters created.")
         # Create PIFA and surroundings
         command = ['Sub Main']
@@ -169,7 +168,6 @@ class MLPIFA(CSTInterface):
         y_offset = OFFSETY
         line_width = LINE
         print("Setting PIFA...")
-        self.create_parameters
         fr4 = ['With Material', '.Reset', '.Name "FR-4 (loss free)"', '.Folder ""', 
                '.FrqType "all"', '.Type "Normal"', '.SetMaterialUnit "GHz", "mm"', 
                '.Epsilon "4.3"', '.Mu "1.0"', '.Kappa "0.0"', '.TanD "0.0"', '.TanDFreq "0.0"', 
@@ -271,7 +269,7 @@ class MLPIFA(CSTInterface):
             optimizer.append(f'.SelectParameter("{name}", True)')
             optimizer.append(f'.SetParameterInit({val})')
             optimizer.append('.SetParameterMin({:.2f})'.format(val*0.5))
-            optimizer.append('.SetParameterMax({:.2f})'.format(val*1.2)) 
+            optimizer.append('.SetParameterMax({:.2f})'.format(val*1.3)) 
         optimizer.append('.DeleteAllGoals')
         goal = ['Dim gid As Integer', 'gid = .AddGoal("1DC Primary Result")', '.SelectGoal(gid, True)', 
                 '.SetGoal1DCResultName(".\\S-Parameters\\S1,1")', '.SetGoalScalarType("magdB20")', 
@@ -290,17 +288,17 @@ class MLPIFA(CSTInterface):
         for key in self.parameters.keys(): self.parameters[key] = self.read_optimizer_para(key)
 
     # Generate input csv file
-    def generate_input(self, n_samples):
-        np.random.seed(42) # set seed for reproducibility
-        # fx = 0.5*np.ones((n_samples,1)) 
+    def generate_input(self, n_samples=N_SAMPLES, seed=SEED):
+        np.random.seed(seed) # set seed for reproducibility
+        # fx = 0.5*np.ones((n_samples,1)) # generate feed x position
         fx = np.random.rand(n_samples, 1) # generate feed x position
         fx = fx*(self.fx_max - self.fx_min) + self.fx_min
-        np.random.seed(42) # set seed for reproducibility
+        np.random.seed(seed) # set seed for reproducibility
         blocks = np.random.randint(0, 2, (n_samples, self.blocks_num)) # generate blocks_num binary input features (0 or 1)
         data = np.concatenate((fx, blocks), axis=1)
-        df = pd.DataFrame(data, columns = ['feedx']+[f'region{i+1}' for i in range(self.blocks_num)]) # create a DataFrame
-        df.to_csv('data/input.csv', index=False) # save to CSV
-        print("Input data generated and saved to 'data/input.csv'")
+        # df = pd.DataFrame(data, columns = ['feedx']+[f'region{i+1}' for i in range(self.blocks_num)]) # create a DataFrame
+        # df.to_csv('data/input.csv', index=False) # save to CSV
+        # print("Input data generated and saved to 'data/input.csv'")
         return data
     
     def set_frequency_solver(self):
