@@ -90,8 +90,7 @@ Please refer to my [main project](https://github.com/electronics10/Topology_Opti
   conda activate mlpifa
   python train.py
   ```
-Trained models would be saved to `./artifacts`.
-Training and validation loss and Prediction vs. True value figures would also be stored. 
+  Trained models would be saved to `./artifacts`. Training and validation loss and Prediction vs. True value figures would also be stored. 
 
 - To show and compare the results of the models in post processing, consecutively run the scripts:
   1. Generate random cases and predictions by the trained model. The prediction `post_prediction.csv` would be saved to `./data`
