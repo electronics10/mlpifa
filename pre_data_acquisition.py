@@ -13,7 +13,7 @@ if __name__ == "__main__":
     os.makedirs("./data/s11", exist_ok=True)
 
     mlpifa = MLPIFA("antennas/mlpifa.cst") # Call mlpifa file
-    # mlpifa.set_environment() # set PIFA and blocks for the first call
+    mlpifa.set_environment() # set PIFA and blocks for the first call
     mlpifa.set_frequency_solver()
     input_data = mlpifa.generate_input() # generate input.csv randomly, [[feedx, binary seq],...]
     iter_start = 0 # start data acquisition from sample 'iter_start'
