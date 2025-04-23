@@ -95,9 +95,9 @@ Training and validation loss and Prediction vs. True value figures would also be
 
 - To show and compare the results of the models in post processing, consecutively run the scripts:
   1. Generate random cases and predictions by the trained model. The prediction `post_prediction.csv` would be saved to `./data`
-    ```
-    python post_predict.py
-    ```
+     ```
+     python post_predict.py
+     ```
   2. Compare PIFA with and without optimization by CST or our trained model by generating s11 data to `./data/s11`.
      ```
      conda deactivate
