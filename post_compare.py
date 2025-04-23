@@ -7,8 +7,9 @@ from pifa_controller import MLPIFA
 from pifa_controller import INIT_P1, INIT_P2, INIT_P3
 
 if __name__ == "__main__":
+    os.makedirs("data/s11", exist_ok=True)
     mlpifa = MLPIFA("antennas/mlpifa.cst") # Call mlpifa file
-    # mlpifa.set_environment() # set PIFA and blocks for the first call
+    mlpifa.set_environment() # set PIFA and blocks for the first call
     mlpifa.set_frequency_solver()
 
     # Read predicted data by model # post
