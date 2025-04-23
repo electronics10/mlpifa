@@ -3,7 +3,7 @@
 # Introduction
 This is a sub-project for antenna design automation. To nearly fully automate the antenna design process subject to basic antenna parameters specifications, please refer to my [main project](https://github.com/electronics10/Topology_Optimization). The computational power and effort are unreal for individual researchers to train a good enough model to replace electromagnetic solver. Thus, work and effort exerted to automate the antenna design by machine learning often result in unuseful or redundant small models that only applies to very specific problems. With this being said, I decided to focus on autotuning PIFA antenna that operates at 2.45 GHz. The reason is that PIFA antenna is an easy yet great and commonly used antenna design. Although PIFA is such a convenient and well studied antenna design, the surrounding materials, e.g. the cover or frame of a phone and the feed point postion, may change in different product designs. Therefore, a few proff of concepts models that can autotune the PIFA antenna parameters according to the surroundings are trained in this project to demonstrate the integrationg of ML in antenna design.
 
-A tabular data `data\data.csv` would be used to train the model. The dataset is acquired by utilizing CST Studio Suite® optimizer to make sure the parameters setup of all PIFA antenna have S11 from 2.3~2.6 GHz below -10 dB. The acqusition process is automated by the script `data_acqusition.py`, and the software setup is identical to my [main project](https://github.com/electronics10/Topology_Optimization). One can obtain their own data by modifying and running the script. The dataset is in the form of 13 numbers in each row/sample with 500 samples. The first ten numbers are the input, with the first number representing the x postion of feed point and the remaining represents a binary sequence implying whether there are PEC surrounding blocks at some fixed positions. The rest 3 numbers are the output, representing the parameters of PIFA antenna shape. A few models are trained on the data and can be compared parallely. To justify the comparison, hyperparameter optimization for each model is performed using random search with 5-fold cross-validation, evaluating 15 trials per model. The best configurations were used to train the final models, ensuring a fair comparison.
+A tabular data `data\data.csv` would be used to train the model. The dataset is acquired by utilizing CST Studio Suite® optimizer to make sure the parameters setup of all PIFA antenna have S11 from 2.3~2.6 GHz below -10 dB. The acqusition process is automated by the script `pre_data_acqusition.py`, and the software setup is identical to my [main project](https://github.com/electronics10/Topology_Optimization). One can obtain their own data by modifying and running the script. The dataset is in the form of 13 numbers in each row/sample with `500` samples. The first ten numbers are the input, with the first number representing the x postion of feed point and the remaining represents a binary sequence implying whether there are PEC surrounding blocks at some fixed positions. The rest 3 numbers are the output, representing the parameters of PIFA antenna shape. A few models are trained on the data and can be compared parallely. To justify the comparison, hyperparameter optimization for each model is performed using random search with 5-fold cross-validation, evaluating 15 trials per model. The best configurations were used to train the final models, ensuring a fair comparison.
 
 ## Prerequisites
 Before running the code, ensure you have the following installed:
@@ -73,21 +73,41 @@ This project uses a predefined environment file (environment.yml) to install all
 conda activate mlpifa
 ```
 
+Please refer to my [main project](https://github.com/electronics10/Topology_Optimization) to create environment `autotune`.
+
 ---
 
 ### 5. Run the Code
+- For new or more data acquirement:
+  ```
+  conda activate autotune
+  python pre_data_acquisition.py
+  ```
+
 - For training, run the script:
-```
-python train_and_save.py
-```
-Hyperparameter optimization would be done by random search and the trained models would be saved to `./model`.
+  ```
+  conda deactivate
+  conda activate mlpifa
+  python train.py
+  ```
+Trained models would be saved to `./artifacts`.
+Training and validation loss and Prediction vs. True value figures would also be stored. 
 
-- To show and compare the results of the models, run the script:
-```
-python load_and_plot.py
-```
-Note that hyperparameters for each models may vary after retrain and should be manually modifed in the script in order to plot the data correctly.
-
+- To show and compare the results of the models in post processing, consecutively run the scripts:
+  1. Generate random cases and predictions by the trained model. The prediction `post_prediction.csv` would be saved to `./data`
+    ```
+    python post_predict.py
+    ```
+  2. Compare PIFA with and without optimization by CST or our trained model by generating s11 data to `./data/s11`.
+     ```
+     conda deactivate
+     conda activate autotune
+     python post_compare.py
+     ```
+  3. Plot s11 comparison.
+     ```
+     python post_plot_s11.py
+     ```
 ---
 
 ## Troubleshooting
