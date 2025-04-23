@@ -1,5 +1,0 @@
-f = open("macro.txt")
-a = f.read()
-a = a.split("\n")
-for index in range(len(a)): a[index] = a[index].strip()
-print(a)
