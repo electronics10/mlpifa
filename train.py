@@ -66,6 +66,7 @@ plt.ylabel('Loss')
 plt.legend()
 plt.grid()
 plt.title('Training and Validation Loss')
+plt.show()
 plt.savefig(f'artifacts/loss.png')
 
 # === Save model ===
