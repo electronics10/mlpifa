@@ -40,6 +40,6 @@ def parse(case, ran):
     plt.title("s: Not optimized / o: Optimized (by CST) / m: Our work")
     plt.legend()
     plt.grid()
-    plt.savefig(f'comparison{CASE}.png')
+    plt.savefig(f'comparison{case}.png')
 
 for case in range(len(files)): parse(case, 1)
