@@ -8,9 +8,8 @@ files = [f for f in os.listdir(data_dir) if f.startswith("s") and f.endswith(".c
 files_cst = [f for f in os.listdir(data_dir) if f.startswith("o") and f.endswith(".csv")]
 files_ml = [f for f in os.listdir(data_dir) if f.startswith("m") and f.endswith(".csv")]
 
-plt.figure(figsize=(10, 5))
-
 def parse(case, ran):
+    plt.figure(figsize=(10, 5))
     for file in files[case:case+ran]:
         file_path = os.path.join(data_dir, file)
         df = pd.read_csv(file_path)  # Assuming headers are present in CSV
