@@ -7,7 +7,7 @@ import os
 import numpy as np
 import pandas as pd
  
-N_SAMPLES = 10
+N_SAMPLES = 500
 SEED = 42
 
 BLOCKS_NUM = 9
