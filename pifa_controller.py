@@ -7,28 +7,30 @@ import os
 import numpy as np
 import pandas as pd
  
-N_SAMPLES = 500
+N_SAMPLES = 10
 SEED = 42
 
 BLOCKS_NUM = 9
 BLOCK_LEN = 3 # mm
-FEEDX_MIN = 8 # mm # initial feedx at mid
-FEEDX_MAX = 12 # mm # initial feedx at mid
-REGIONX = 26 # mm
-REGIONY = 7 # mm
+BLOCK_SEPERATION = 2
+FEEDX_MIN = 7 # mm # initial feedx at mid
+FEEDX_MAX = 10 # mm # initial feedx at mid
+REGIONX = 21 # mm
+REGIONY = 8 # mm
 OFFSETY = 150 - BLOCK_LEN - REGIONY # mm
+PATCH_OFFSET = 0.1 # mm
 
-INIT_P1 = 4.67 # 2.52 # mm, pin dis
-INIT_P2 = 20.54 # 8.63 # mm, patch len
-INIT_P3 = 4.09 # 1.84 # mm, pin width
-LINE = 1 # 0.5 # mm
+INIT_P1 = 3.87 # mm, pin dis
+INIT_P2 = 20 # mm, patch len
+INIT_P3 = 6.34 # mm, pin width
+LINE = 1 # mm
 
-FMIN = 2 # 4.5 # GHz
-FMAX = 3 #　6.5 # GHz
+FMIN = 2 # GHz
+FMAX = 3 # GHz
 
 GOAL = -10 # -7 # dB
-GFMIN = 2.3 # 4.9 # GHz
-GFMAX = 2.6 # 5.9 # GHz
+GFMIN = 2.4 # GHz
+GFMAX = 2.5 # GHz
 
 class CSTInterface:
     def __init__(self, fname):
@@ -97,6 +99,7 @@ class MLPIFA(CSTInterface):
         super().__init__(fname)
         self.blocks_num = BLOCKS_NUM
         self.block_len = BLOCK_LEN
+        self.block_sep = BLOCK_SEPERATION
         self.fx_min = FEEDX_MIN 
         self.fx_max = FEEDX_MAX
         self.desRegionX = REGIONX
@@ -155,7 +158,7 @@ class MLPIFA(CSTInterface):
         # Initiate parameters
         for name, val in self.parameters.items(): 
             self.create_parameters(name, val)
-        self.create_parameters('fx', (self.fx_min+self.fx_max)/2) # create initial fx=11mm
+        self.create_parameters('fx', (self.fx_min+self.fx_max)/2) # create initial fx
         print("Parameters created.")
         # Create PIFA and surroundings
         command = ['Sub Main']
@@ -188,7 +191,8 @@ class MLPIFA(CSTInterface):
                f'.Xrange "fx-pin_dis", "fx-pin_dis+{line_width}"', '.Yrange "0", "pin_width"', '.Zrange "0", "0.035"', 
                '.Create', 'End With']
         patch = ['With Brick', '.Reset', '.Name "patch"', '.Component "component1"', '.Material "PEC"', 
-                 '.Xrange "fx-pin_dis", "fx-pin_dis+patch_len"', f'.Yrange "pin_width", "pin_width+{line_width}"', 
+                 f'.Xrange "{self.block_len+PATCH_OFFSET}", "patch_len+{self.block_len}"', 
+                 f'.Yrange "pin_width", "pin_width+{line_width}"', 
                  '.Zrange "0", "0.035"', '.Create', 'End With']
         feed = ['With Brick', '.Reset', '.Name "feed"', '.Component "component1"', '.Material "PEC"', 
                 f'.Xrange "fx-{line_width/2}", "fx+{line_width/2}"', '.Yrange "1", "pin_width"', '.Zrange "0", "0.035"', 
@@ -206,13 +210,13 @@ class MLPIFA(CSTInterface):
         self.update_distribution(binary_sequence) # Define materials first
         pos = []
         y_pos = 0
-        xleft = -self.block_len
-        xright = self.desRegionX + 2*self.block_len
+        xleft = -self.block_sep
+        xright = self.desRegionX + self.block_len + self.block_sep
         for i in range(self.blocks_num):
             if (i%2) == 0: # left
                 if y_pos <= self.desRegionY:pos.append((0, y_pos))
                 else:
-                    xleft += 2*self.block_len
+                    xleft += self.block_len + self.block_sep
                     if xright-xleft < self.block_len:
                         print(f"Too many blocks. Total {i} blocks generated.")
                         break 
@@ -220,14 +224,14 @@ class MLPIFA(CSTInterface):
             else: # right
                 if y_pos < self.desRegionY:
                     pos.append((self.desRegionX+self.block_len, y_pos))
-                    y_pos += 2*self.block_len
-                elif y_pos == self.desRegionY:
-                    xleft = 0
-                    xright = self.desRegionX + self.block_len
+                    y_pos += self.block_len + self.block_sep
+                elif y_pos == self.desRegionY: # y_pos aligned to max y range
+                    xleft = 0 # align xleft
+                    xright = self.desRegionX + self.block_len # align xright
                     pos.append((self.desRegionX+self.block_len, y_pos))
-                    y_pos += 2*self.block_len
+                    y_pos += self.block_len + self.block_sep
                 else:
-                    xright -= 2*self.block_len
+                    xright -= self.block_len + self.block_sep
                     if xright-xleft < self.block_len:
                         print(f"Too many blocks. Total {i} blocks generated.")
                         break 
@@ -237,6 +241,7 @@ class MLPIFA(CSTInterface):
         self.prj.modeler.add_to_history("domain",command)
         self.save()
         print("Blocks set")
+        return pos
 
     def set_port(self):
         command = ['With DiscretePort', '.Reset', '.PortNumber "1"', 
@@ -256,7 +261,7 @@ class MLPIFA(CSTInterface):
         self.excute_vba(command)
         print("Port deleted")
 
-    def optimize(self): # input_seq = [feedx, b0, b1, b2, ..., bn] 
+    def optimize(self, feedx): # input_seq = [feedx, b0, b1, b2, ..., bn] 
         print("Optimizing...")
         task = ['Sub Main','With SimulationTask', '.Reset', '.Name ("Opt")', 'If Not .DoesExist Then', 
                 '.Type ("Optimization")', '.Create', '.Reset', '.Type ("S-Parameters")', 
@@ -268,8 +273,15 @@ class MLPIFA(CSTInterface):
         for name, val in self.parameters.items():
             optimizer.append(f'.SelectParameter("{name}", True)')
             optimizer.append(f'.SetParameterInit({val})')
-            optimizer.append('.SetParameterMin({:.2f})'.format(val*0.5))
-            optimizer.append('.SetParameterMax({:.2f})'.format(val*1.3)) 
+            if name == "pin_dis":
+                optimizer.append('.SetParameterMin({:.2f})'.format(0.5))
+                optimizer.append('.SetParameterMax({:.2f})'.format(feedx-self.block_len-PATCH_OFFSET)) 
+            elif name == "patch_len":
+                optimizer.append('.SetParameterMin({:.2f})'.format(feedx-self.block_len+0.5))
+                optimizer.append('.SetParameterMax({:.2f})'.format(REGIONX-PATCH_OFFSET)) 
+            elif name == "pin_width":
+                optimizer.append('.SetParameterMin({:.2f})'.format(LINE))
+                optimizer.append('.SetParameterMax({:.2f})'.format(REGIONY-LINE-PATCH_OFFSET)) 
         optimizer.append('.DeleteAllGoals')
         goal = ['Dim gid As Integer', 'gid = .AddGoal("1DC Primary Result")', '.SelectGoal(gid, True)', 
                 '.SetGoal1DCResultName(".\\S-Parameters\\S1,1")', '.SetGoalScalarType("magdB20")', 
@@ -296,9 +308,9 @@ class MLPIFA(CSTInterface):
         np.random.seed(seed) # set seed for reproducibility
         blocks = np.random.randint(0, 2, (n_samples, self.blocks_num)) # generate blocks_num binary input features (0 or 1)
         data = np.concatenate((fx, blocks), axis=1)
-        # df = pd.DataFrame(data, columns = ['feedx']+[f'region{i+1}' for i in range(self.blocks_num)]) # create a DataFrame
-        # df.to_csv('data/input.csv', index=False) # save to CSV
-        # print("Input data generated and saved to 'data/input.csv'")
+        df = pd.DataFrame(data, columns = ['feedx']+[f'region{i+1}' for i in range(self.blocks_num)]) # create a DataFrame
+        df.to_csv('data/input.csv', index=False) # save to CSV
+        print("Input data generated and saved to 'data/input.csv'")
         return data
     
     def set_frequency_solver(self):
