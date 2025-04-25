@@ -22,7 +22,8 @@ for index in range(len(predicted_data)): # Loop through all n samples and run CS
         input_seq = list(predicted_data[index, :10])
         print(f"\nSample{index} optimizing...")
         # Update feedx and blocks material
-        mlpifa.create_parameters('fx', input_seq[0]) # update fx
+        feedx = input_seq[0]
+        mlpifa.create_parameters('fx', feedx) # update fx
         mlpifa.update_distribution(input_seq[1:]) # ignore fx in the first index and update blocks material
 
         # Without optimization
@@ -42,7 +43,7 @@ for index in range(len(predicted_data)): # Loop through all n samples and run CS
         data = pd.DataFrame(s11[:,:-1], columns=['freq', 's11']) # create a DataFrame
         data.to_csv(f'data/s11/s{index}.csv', index=False) # save to CSV
         print(f"S11 saved to 'data/s11/s{index}.csv'")
-        # Store data into data.csv for training usage # post
+        # Store data into data.csv for further inspection # post
         data1 = input_seq
         for val in mlpifa.parameters.values(): data1.append(val)
         with open('data/data_wo.csv', 'a', newline='') as csvfile:
@@ -73,7 +74,7 @@ for index in range(len(predicted_data)): # Loop through all n samples and run CS
         data = pd.DataFrame(s11[:,:-1], columns=['freq', 's11']) # create a DataFrame
         data.to_csv(f'data/s11/m{index}.csv', index=False) # save to CSV
         print(f"S11 saved to 'data/s11/m{index}.csv'")
-        # Store data into data.csv for training usage # post
+        # Store data into data.csv for further inspection # post
         data2 = input_seq
         for val in mlpifa.parameters.values(): data2.append(val)
         with open('data/data_ml.csv', 'a', newline='') as csvfile:
@@ -88,7 +89,7 @@ for index in range(len(predicted_data)): # Loop through all n samples and run CS
         mlpifa.set_port()
         start_time = time.time()
         mlpifa.parameters = {"pin_dis":INIT_P1, "patch_len":INIT_P2, "pin_width":INIT_P3} # altered to make optimizer start with these values
-        mlpifa.optimize() # run CST optimizer
+        mlpifa.optimize(feedx) # run CST optimizer
         end_time = time.time()
         print("optimization time =", end_time-start_time)
         print(f"Sample{index} optimized")
@@ -99,14 +100,14 @@ for index in range(len(predicted_data)): # Loop through all n samples and run CS
         data = pd.DataFrame(s11[:,:-1], columns=['freq', 's11']) # create a DataFrame
         data.to_csv(f'data/s11/o{index}.csv', index=False) # save to CSV
         print(f"S11 saved to 'data/s11/o{index}.csv'")
-        # Store data into data.csv for training usage
-            mlpifa.update_parameter_dict()
-            data3 = input_seq
-            for val in mlpifa.parameters.values(): data3.append(val)
-            with open('data/data_CST.csv', 'a', newline='') as csvfile:
-                writer = csv.writer(csvfile)
-                writer.writerow(data3)
-                print("Input and ouput parameters stored in data/data.csv")
+        # Store data into data.csv for further inspection
+        mlpifa.update_parameter_dict()
+        data3 = input_seq
+        for val in mlpifa.parameters.values(): data3.append(val)
+        with open('data/data_CST.csv', 'a', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(data3)
+            print("Input and ouput parameters stored in data/data.csv")
         # Clear legacy for next iteration
         mlpifa.delete_results()
         mlpifa.delete_port() # feed postion may change in next iterationeed postion may change in next iteration
