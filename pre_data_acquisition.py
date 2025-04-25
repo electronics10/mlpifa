@@ -26,34 +26,6 @@ for index in range(iter_start, len(input_data)): # Loop through all n samples an
         feedx = input_seq[0]
         mlpifa.create_parameters('fx', feedx) # update fx
         mlpifa.update_distribution(input_seq[1:]) # ignore fx in the first index and update blocks material
-        
-        # Without optimization
-        # Update parameters # post
-        mlpifa.parameters = {"pin_dis":INIT_P1, "patch_len":INIT_P2, "pin_width":INIT_P3} # post
-        for key, value in mlpifa.parameters.items(): # post
-             print(f"key: {key}; value: {value}") # post
-             mlpifa.create_parameters(key, value) # post
-        # Without optimization # post
-        mlpifa.set_port() # post
-        mlpifa.start_simulate() # post
-        print(f"Sample{index} solved without optimization") #post
-        # Obtain S11 for further inspection # post
-        s11 = mlpifa.read('1D Results\\S-Parameters\\S1,1') # [freq, s11 50+j,...]
-        s11 = np.abs(np.array(s11))
-        s11[:,1] = 20*np.log10(s11[:,1]) # change s11 to dB
-        data = pd.DataFrame(s11[:,:-1], columns=['freq', 's11']) # create a DataFrame
-        data.to_csv(f'data/s11/s{index}.csv', index=False) # save to CSV
-        print(f"S11 saved to 'data/s11/s{index}.csv'")
-        # Store data into data.csv for further inspection # post
-        data1 = input_seq
-        for val in mlpifa.parameters.values(): data1.append(val)
-        with open('data/data_wo.csv', 'a', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow(data1)
-            print("Input and ouput parameters stored in data/data_wo.csv")
-        # Clear legacy for optimization # post
-        mlpifa.delete_results() # post
-        mlpifa.delete_port() # post
 
         # Optimize
         mlpifa.set_port()
