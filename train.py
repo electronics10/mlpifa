@@ -42,7 +42,7 @@ loss_fn = nn.MSELoss()
 
 # === Training loop ===
 loss_list = []
-for epoch in range(3000):
+for epoch in range(2500):
     model.train()
     optimizer.zero_grad()
     y_pred = model(X_train)
