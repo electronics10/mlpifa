@@ -32,7 +32,7 @@ X_scaled = x_scaler.transform(X)
 X_test = torch.tensor(X_scaled)
 
 model = AntennaMLP()
-model.load_state_dict(torch.load("artifacts/mlp_model.pt"))
+model.load_state_dict(torch.load("artifacts/best_model.pt"))
 model.eval()
 
 # === Predict ===
