@@ -1,60 +1,100 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+from models import AntennaMLP
 import os
-import pickle
-import platform
-import models as mymd
 
-# === Load dataset ===
-df = pd.read_csv("data/data.csv")
-X = df.iloc[:, :10].values.astype(np.float32)
-y = df.iloc[:, 10:13].values.astype(np.float32)
+FOLDER = "artifacts"
+os.makedirs(FOLDER, exist_ok=True)
 
-# === Normalize ===
-x_scaler = StandardScaler()
-y_scaler = StandardScaler()
+# Device configuration
+device = torch.device("mps" if torch.backends.mps.is_built() else "cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using {device} device")
+
+# Load dataset
+data = pd.read_csv('data/data.csv').values
+X = data[:, :10]
+y = data[:, 10:13]
+
+# Normalize inputs and outputs separately
+x_scaler = MinMaxScaler()
+y_scaler = MinMaxScaler()
+
 X = x_scaler.fit_transform(X)
 y = y_scaler.fit_transform(y)
 
-# Save scalers
-os.makedirs("artifacts", exist_ok=True)
-pickle.dump(x_scaler, open("artifacts/x_scaler.pkl", "wb"))
-pickle.dump(y_scaler, open("artifacts/y_scaler.pkl", "wb"))
-
-# === Train/test split ===
+# Train/test split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# === Convert to torch tensors ===
-X_train = torch.tensor(X_train)
-y_train = torch.tensor(y_train)
-X_test = torch.tensor(X_test)
-y_test = torch.tensor(y_test)
+X_train = torch.tensor(X_train, dtype=torch.float32).to(device)
+y_train = torch.tensor(y_train, dtype=torch.float32).to(device)
+X_test = torch.tensor(X_test, dtype=torch.float32).to(device)
+y_test = torch.tensor(y_test, dtype=torch.float32).to(device)
 
-model = mymd.MLP()
-optimizer = optim.Adam(model.parameters(), lr=1e-5)
-loss_fn = nn.MSELoss()
+# Model, Loss, Optimizer
+model = AntennaMLP().to(device)
 
-# === Training loop ===
+# Define per-output weights (e.g., [D, L, W])
+output_weights = torch.tensor([1.0, 1.0, 1.0]).to(device)  # Adjustable
+
+class WeightedMSELoss(nn.Module):
+    def __init__(self, weights):
+        super(WeightedMSELoss, self).__init__()
+        self.weights = weights
+
+    def forward(self, preds, targets):
+        loss = self.weights * (preds - targets) ** 2
+        return loss.mean()
+
+criterion = WeightedMSELoss(output_weights)
+optimizer = optim.Adam(model.parameters(), lr=1e-4)
+
+# Early stopping settings
+early_stopping_patience = 70
+best_loss = float('inf')
+patience_counter = 0
+
+# Training loop
+num_epochs = 10000
 loss_list = []
-for epoch in range(2500):
+
+for epoch in range(num_epochs):
     model.train()
     optimizer.zero_grad()
-    y_pred = model(X_train)
-    loss = loss_fn(y_pred, y_train)
+    outputs = model(X_train)
+    loss = criterion(outputs, y_train)
     loss.backward()
     optimizer.step()
-    # Record training and validation loss
+
     model.eval()
-    val_pred = model(X_test)
-    val_loss = loss_fn(val_pred, y_test)
-    if epoch % 50 == 0: print(f"Epoch {epoch}, Training Loss: {loss.item():.4f}, Validation Loss: {val_loss.item():.4f}")
-    loss_list.append([epoch, loss.item(), val_loss.item()])
+    with torch.no_grad():
+        test_outputs = model(X_test)
+        test_loss = criterion(test_outputs, y_test)
+        loss_list.append([epoch, loss.item(), test_loss.item()])
+
+    if epoch % 10 == 0:
+        print(f"Epoch {epoch}, Train Loss: {loss.item():.4f}, Test Loss: {test_loss.item():.4f}")
+
+    # Early stopping
+    if test_loss.item() < best_loss:
+        best_loss = test_loss.item()
+        best_model_state = model.state_dict()
+        patience_counter = 0
+    else:
+        patience_counter += 1
+
+    if patience_counter >= early_stopping_patience:
+        print(f"Early stopping at epoch {epoch}")
+        break
+
+
+# Save the model
+torch.save(model.state_dict(), f'{FOLDER}/best_model.pth')
 
 # === Save loss ===
 loss_list = np.array(loss_list)
@@ -66,33 +106,27 @@ plt.ylabel('Loss')
 plt.legend()
 plt.grid()
 plt.title('Training and Validation Loss')
+plt.savefig(f'{FOLDER}/loss.png')
 plt.show()
-plt.savefig(f'artifacts/loss.png')
 
-# === Save model ===
-torch.save(model.state_dict(), "artifacts/mlp_model.pt")
 
-# === Predict ===
+# Evaluation and plotting
+model.load_state_dict(torch.load(f"{FOLDER}/best_model.pth")) # Load best model saved
+model.eval()
 with torch.no_grad():
-    y_pred_scaled = model(X_test).numpy()
-    y_pred = y_scaler.inverse_transform(y_pred_scaled)
-    y_true = y_scaler.inverse_transform(y_test.numpy())
+    preds = model(X_test)
+    preds = preds.cpu().numpy()
+    y_true = y_test.cpu().numpy()
 
-# === Save predictions for review ===
-np.savetxt("artifacts/predictions.csv", np.hstack([y_true, y_pred]), delimiter=",", header="true_1,true_2,true_3,pred_1,pred_2,pred_3", comments="")
-
-# === Compute and save test loss ===
-mse = np.mean((y_pred - y_true) ** 2)
-with open("artifacts/test_loss.txt", "w") as f:
-    f.write(f"MSE on test set: {mse:.6f}\n")
-
-print(f"Test MSE: {mse:.6f}")
+# Inverse transform
+preds = y_scaler.inverse_transform(preds)
+y_true = y_scaler.inverse_transform(y_true)
 
 # === Plot each output ===
 output_labels = ['D', 'L', 'W'] # pin_dis, patch_len, pin_width
 for i in range(3):
     plt.figure(figsize=(6, 5))
-    plt.scatter(y_true[:, i], y_pred[:, i], alpha=0.6)
+    plt.scatter(y_true[:, i], preds[:, i], alpha=0.6)
     plt.plot([y_true[:, i].min(), y_true[:, i].max()],
              [y_true[:, i].min(), y_true[:, i].max()], 'r--')
     plt.xlabel('True Value')
@@ -100,5 +134,13 @@ for i in range(3):
     plt.title(f'{output_labels[i]}: Predicted vs True')
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig(f'artifacts/output_{i+1}_plot.png')
+    plt.savefig(f'{FOLDER}/output_{i+1}_plot.png')
+    plt.show()
     plt.close()
+
+# === Compute and save test loss ===
+mse = np.mean((preds - y_true) ** 2)
+with open(f"{FOLDER}/test_loss.txt", "w") as f:
+    f.write(f"MSE on test set: {mse:.6f}\n")
+
+print(f"Test MSE: {mse:.6f}")
