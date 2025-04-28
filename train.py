@@ -8,6 +8,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from models import AntennaMLP
 import os
+import pickle
 
 FOLDER = "artifacts"
 os.makedirs(FOLDER, exist_ok=True)
@@ -27,6 +28,10 @@ y_scaler = MinMaxScaler()
 
 X = x_scaler.fit_transform(X)
 y = y_scaler.fit_transform(y)
+
+# Save scalers
+pickle.dump(x_scaler, open(f"{FOLDER}/x_scaler.pkl", "wb"))
+pickle.dump(y_scaler, open(f"{FOLDER}/y_scaler.pkl", "wb"))
 
 # Train/test split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
