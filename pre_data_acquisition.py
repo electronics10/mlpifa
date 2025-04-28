@@ -16,7 +16,7 @@ if __name__ == "__main__":
     # mlpifa.set_environment() # set PIFA and blocks for the first call
     mlpifa.set_frequency_solver()
     input_data = mlpifa.generate_input() # generate input.csv randomly, [[feedx, binary seq],...]
-    iter_start = 0 # start data acquisition from sample 'iter_start'
+    iter_start = 380 # start data acquisition from sample 'iter_start'
 
 for index in range(iter_start, len(input_data)): # Loop through all n samples and run CST optimizer
         mlpifa.delete_results() # clear legacy
