@@ -3,7 +3,7 @@ import torch.nn as nn
 import pickle
 import pandas as pd
 import numpy as np
-import models as mymd
+from models import AntennaMLP
 
 SEED = 30
 FEEDX_MAX = 12
@@ -31,7 +31,7 @@ y_scaler = pickle.load(open("artifacts/y_scaler.pkl", "rb"))
 X_scaled = x_scaler.transform(X)
 X_test = torch.tensor(X_scaled)
 
-model = mymd.MLP()
+model = AntennaMLP()
 model.load_state_dict(torch.load("artifacts/mlp_model.pt"))
 model.eval()
 
