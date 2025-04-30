@@ -8,8 +8,6 @@ import numpy as np
 import pandas as pd
 from settings import*
 
-SEED = 42
-
 class CSTInterface:
     def __init__(self, fname):
         self.full_path = os.getcwd() + f"\{fname}"
