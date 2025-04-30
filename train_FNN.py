@@ -9,8 +9,9 @@ from sklearn.preprocessing import MinMaxScaler
 from models import AntennaMLP
 import os
 import pickle
+from settings import FEEDX_MAX, FEEDX_MIN, BLOCKS_NUM
 
-FOLDER = "artifacts"
+FOLDER = "artifacts_FNN"
 os.makedirs(FOLDER, exist_ok=True)
 
 # Device configuration
@@ -99,7 +100,7 @@ for epoch in range(num_epochs):
 
 
 # Save the model
-torch.save(model.state_dict(), f'{FOLDER}/best_model.pth')
+torch.save(model.state_dict(), f'{FOLDER}/model.pth')
 
 # === Save loss ===
 loss_list = np.array(loss_list)
@@ -116,7 +117,7 @@ plt.show()
 
 
 # Evaluation and plotting
-model.load_state_dict(torch.load(f"{FOLDER}/best_model.pth")) # Load best model saved
+model.load_state_dict(torch.load(f"{FOLDER}/model.pth")) # Load best model saved
 model.eval()
 with torch.no_grad():
     preds = model(X_test)
@@ -149,3 +150,30 @@ with open(f"{FOLDER}/test_loss.txt", "w") as f:
     f.write(f"MSE on test set: {mse:.6f}\n")
 
 print(f"Test MSE: {mse:.6f}")
+
+
+# === Output 5 predictions ===
+def generate_input():
+    np.random.seed(30)
+    samples = 5
+    fx = np.random.rand(samples, 1).astype(np.float32) # generate feed x position
+    fx = fx*(FEEDX_MAX - FEEDX_MIN) + FEEDX_MIN
+    np.random.seed(30)
+    blocks = np.random.randint(0, 2, (samples, BLOCKS_NUM))
+    data = np.concatenate((fx, blocks), axis=1).astype(np.float32)
+    return data
+
+X = generate_input()
+x_scaler = pickle.load(open(f"{FOLDER}/x_scaler.pkl", "rb"))
+y_scaler = pickle.load(open(f"{FOLDER}/y_scaler.pkl", "rb"))
+X_scaled = x_scaler.transform(X)
+X_test = torch.tensor(X_scaled, dtype=torch.float32).to(device)
+
+model.load_state_dict(torch.load(f"{FOLDER}/model.pth")) # Load best model saved
+model.eval()
+with torch.no_grad():
+    y_pred_scaled = model(X_test).cpu().numpy()
+    y_pred = y_scaler.inverse_transform(y_pred_scaled)
+
+df = pd.DataFrame(np.concatenate((X, y_pred), axis=1))
+df.to_csv(f'{FOLDER}/post_prediction.csv', header = None, index=False)
