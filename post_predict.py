@@ -4,12 +4,9 @@ import pickle
 import pandas as pd
 import numpy as np
 from models import AntennaMLP
+from settings import*
 
 SEED = 30
-FEEDX_MAX = 12
-FEEDX_MIN = 8
-BLOCKS_NUM = 9
-
 SAMPLES = 5
 
 # === Load test input data ===
