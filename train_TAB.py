@@ -6,11 +6,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
-from models import AntennaMLP
 from tab_transformer_pytorch import TabTransformer
 from torch.utils.data import DataLoader, TensorDataset
 import os
 import pickle
+from settings import FEEDX_MAX, FEEDX_MIN, BLOCKS_NUM
 
 FOLDER = "artifacts_TAB"
 os.makedirs(FOLDER, exist_ok=True)
@@ -40,17 +40,14 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 
 # Prepare data for TabTransformer
 # Convert to torch tensors and move to device
-
 y_train_tensor = torch.FloatTensor(y_train).to(device)
 y_test_tensor = torch.FloatTensor(y_test).to(device)
 categorical_columns = list(range(1, 10))
-
 continuous_columns = [0]
 X_train_cat = X_train[:, categorical_columns].astype(int)
 X_test_cat = X_test[:, categorical_columns].astype(int)
 X_train_cont = X_train[:, continuous_columns]
 X_test_cont = X_test[:, continuous_columns]
-
 X_train_cat_tensor = torch.LongTensor(X_train_cat).to(device)
 X_test_cat_tensor = torch.LongTensor(X_test_cat).to(device)
 X_train_cont_tensor = torch.FloatTensor(X_train_cont).to(device)
@@ -120,7 +117,7 @@ for epoch in range(num_epochs):
 
 
 # Save the model
-torch.save(model.state_dict(), f'{FOLDER}/TAB_model.pth')
+torch.save(model.state_dict(), f'{FOLDER}/model.pth')
 
 # === Save loss ===
 loss_list = np.array(loss_list)
@@ -137,7 +134,7 @@ plt.show()
 
 
 # Evaluation and plotting
-model.load_state_dict(torch.load(f"{FOLDER}/TAB_model.pth")) # Load best model saved
+model.load_state_dict(torch.load(f"{FOLDER}/model.pth"))
 model.eval()
 with torch.no_grad():
     preds = model(X_test_cat_tensor, X_test_cont_tensor).cpu().numpy()
@@ -169,3 +166,35 @@ with open(f"{FOLDER}/test_loss.txt", "w") as f:
     f.write(f"MSE on test set: {mse:.6f}\n")
 
 print(f"Test MSE: {mse:.6f}")
+
+# === Output 5 predictions ===
+def generate_input():
+    np.random.seed(30)
+    samples = 5
+    fx = np.random.rand(samples, 1).astype(np.float32) # generate feed x position
+    fx = fx*(FEEDX_MAX - FEEDX_MIN) + FEEDX_MIN
+    np.random.seed(30)
+    blocks = np.random.randint(0, 2, (samples, BLOCKS_NUM))
+    data = np.concatenate((fx, blocks), axis=1).astype(np.float32)
+    return data
+
+X = generate_input()
+x_scaler = pickle.load(open(f"{FOLDER}/x_scaler.pkl", "rb"))
+y_scaler = pickle.load(open(f"{FOLDER}/y_scaler.pkl", "rb"))
+X_test = x_scaler.transform(X)
+
+categorical_columns = list(range(1, 10))
+continuous_columns = [0]
+X_test_cat = X_test[:, categorical_columns].astype(int)
+X_test_cont = X_test[:, continuous_columns]
+X_test_cat_tensor = torch.LongTensor(X_test_cat).to(device)
+X_test_cont_tensor = torch.FloatTensor(X_test_cont).to(device)
+
+model.load_state_dict(torch.load(f"{FOLDER}/model.pth"))
+model.eval()
+with torch.no_grad():
+    y_pred_scaled = model(X_test_cat_tensor, X_test_cont_tensor).cpu().numpy()
+    y_pred = y_scaler.inverse_transform(y_pred_scaled)
+
+df = pd.DataFrame(np.concatenate((X, y_pred), axis=1))
+df.to_csv(f'{FOLDER}/post_prediction.csv', header = None, index=False)
