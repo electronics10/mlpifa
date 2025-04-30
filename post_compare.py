@@ -5,7 +5,7 @@ import csv
 import pandas as pd
 import time
 from pifa_controller import MLPIFA
-from pifa_controller import INIT_P1, INIT_P2, INIT_P3
+from settings import INIT_P1, INIT_P2, INIT_P3
 
 if __name__ == "__main__":
     os.makedirs("data/s11", exist_ok=True)
