@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
-from pifa_controller import GOAL, GFMIN, GFMAX
+from settings import GOAL, GFMIN, GFMAX
 
 data_dir = "./data/s11/"
 files = [f for f in os.listdir(data_dir) if f.startswith("s") and f.endswith(".csv")]
@@ -15,28 +15,25 @@ def parse(case, ran):
         df = pd.read_csv(file_path)  # Assuming headers are present in CSV
         frequency = df.iloc[:, 0]
         s11 = df.iloc[:, 1]
-        label = file.replace(".csv", "")
-        plt.plot(frequency, s11, label=label, linestyle=':', color = '#000')
+        plt.plot(frequency, s11, label='Initial', linestyle=':', color = '#000')
     for file in files_cst[case:case+ran]:
         file_path = os.path.join(data_dir, file)
         df = pd.read_csv(file_path)  # Assuming headers are present in CSV
         frequency = df.iloc[:, 0]
         s11 = df.iloc[:, 1]
-        label = file.replace(".csv", "")
-        plt.plot(frequency, s11, label=label, linestyle='--', color = '#4D0')
+        plt.plot(frequency, s11, label='CST', linestyle='--', color = '#4D0')
     for file in files_ml[case:case+ran]:
         file_path = os.path.join(data_dir, file)
         df = pd.read_csv(file_path)  # Assuming headers are present in CSV
         frequency = df.iloc[:, 0]
         s11 = df.iloc[:, 1]
-        label = file.replace(".csv", "")
-        plt.plot(frequency, s11, label=label, linestyle='-', color = '#00F')
+        plt.plot(frequency, s11, label='Our Work', linestyle='-', color = '#00F')
     plt.axvline(x = GFMIN, linestyle='-.', color = '#999')
     plt.axvline(x = GFMAX, linestyle='-.', color = '#999')
     plt.axhline(y = GOAL, linestyle='-.', color = '#999')
     plt.xlabel("Frequency")
     plt.ylabel("S11")
-    plt.title("s: Not optimized / o: Optimized (by CST) / m: Our work")
+    plt.title(f"Comparison{case}")
     plt.legend()
     plt.grid()
     plt.savefig(f'comparison{case}.png')
