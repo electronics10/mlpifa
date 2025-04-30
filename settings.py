@@ -1,5 +1,4 @@
 N_SAMPLES = 500
-SEED = 42
 
 BLOCKS_NUM = 9
 BLOCK_LEN = 3 # mm
