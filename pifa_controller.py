@@ -80,7 +80,7 @@ class MLPIFA(CSTInterface):
         self.fx_max = FEEDX_MAX
         self.desRegionX = REGIONX
         self.desRegionY = REGIONY
-        self.parameters = {"pin_dis":INIT_P1, "patch_len":INIT_P2, "pin_width":INIT_P3} # 2.45 GHz PIFA
+        self.parameters = {'L':L, 'D': D, 'H': H, 'W': W}
 
     def excute_vba(self,  command):
         command = "\n".join(command)
@@ -144,9 +144,9 @@ class MLPIFA(CSTInterface):
         self.excute_vba(command)
 
     def set_PIFA(self):
-        y_offset = OFFSETY
-        line_width = LINE
         print("Setting PIFA...")
+        pline = 1.5 # mm
+        fline = 0.2 # mm
         fr4 = ['With Material', '.Reset', '.Name "FR-4 (loss free)"', '.Folder ""', 
                '.FrqType "all"', '.Type "Normal"', '.SetMaterialUnit "GHz", "mm"', 
                '.Epsilon "4.3"', '.Mu "1.0"', '.Kappa "0.0"', '.TanD "0.0"', '.TanDFreq "0.0"', 
@@ -158,20 +158,20 @@ class MLPIFA(CSTInterface):
                '.ThermalConductivity "0.3"', '.SetActiveMaterial "all"', '.Colour "0.75", "0.95", "0.85"', 
                '.Wireframe "False"', '.Transparency "0"', '.Create', 'End With']
         substrate = ['With Brick', '.Reset', '.Name "substrate"', '.Component "component1"', '.Material "FR-4 (loss free)"', 
-                     f'.Xrange "0", "75"', f'.Yrange "-{y_offset}", "150-{y_offset}"', 
+                     f'.Xrange "0", "75"', f'.Yrange "-{OFFSETY}", "150-{OFFSETY}"', 
                      '.Zrange "-1.6", "0"', '.Create', 'End With']
         ground = ['With Brick', '.Reset', '.Name "ground"', '.Component "component1"', 
-                  '.Material "PEC"', f'.Xrange "0", "75"', f'.Yrange "-{y_offset}", "0"', 
+                  '.Material "PEC"', f'.Xrange "0", "75"', f'.Yrange "-{OFFSETY}", "0"', 
                   '.Zrange "0", "0.035"', '.Create', 'End With']
         pin = ['With Brick', '.Reset', '.Name "pin"', '.Component "component1"', '.Material "PEC"', 
-               f'.Xrange "fx-pin_dis", "fx-pin_dis+{line_width}"', '.Yrange "0", "pin_width"', '.Zrange "0", "0.035"', 
+               f'.Xrange "fx-D+{BLOCK_LEN}", "fx-D+W+{BLOCK_LEN}"', f'.Yrange "0", "H-{pline}"', '.Zrange "0", "0.035"', 
                '.Create', 'End With']
         patch = ['With Brick', '.Reset', '.Name "patch"', '.Component "component1"', '.Material "PEC"', 
-                 f'.Xrange "{self.block_len+PATCH_OFFSET}", "patch_len+{self.block_len}"', 
-                 f'.Yrange "pin_width", "pin_width+{line_width}"', 
+                 f'.Xrange "fx-D+{BLOCK_LEN}", "L+fx+{BLOCK_LEN}"', 
+                 f'.Yrange "H-{pline}", "H"', 
                  '.Zrange "0", "0.035"', '.Create', 'End With']
         feed = ['With Brick', '.Reset', '.Name "feed"', '.Component "component1"', '.Material "PEC"', 
-                f'.Xrange "fx-{line_width/2}", "fx+{line_width/2}"', '.Yrange "1", "pin_width"', '.Zrange "0", "0.035"', 
+                f'.Xrange "fx-{fline/2}+{BLOCK_LEN}", "fx+{fline/2}+{BLOCK_LEN}"', f'.Yrange "1", "H-{pline}"', '.Zrange "0", "0.035"', 
                 '.Create', 'End With']
         command = fr4 + substrate + ground + pin + patch + feed
         command = "\n".join(command)
@@ -223,7 +223,7 @@ class MLPIFA(CSTInterface):
         command = ['With DiscretePort', '.Reset', '.PortNumber "1"', 
                    '.Type "SParameter"', '.Label ""', '.Folder ""', '.Impedance "50.0"', 
                    '.Voltage "1.0"', '.Current "1.0"', '.Monitor "True"', '.Radius "0.0"', 
-                   '.SetP1 "False", "fx", "1", "0.035"', '.SetP2 "False", "fx", "0", "0.035"', 
+                   f'.SetP1 "False", "fx+{BLOCK_LEN}", "1", "0.035"', f'.SetP2 "False", "fx+{BLOCK_LEN}", "0", "0.035"', 
                 '.InvertDirection "False"', '.LocalCoordinates "False"', '.Wire ""',
                 '.Position "end1"', '.Create', 'End With']
         # self.excute_vba(command)
@@ -249,15 +249,18 @@ class MLPIFA(CSTInterface):
         for name, val in self.parameters.items():
             optimizer.append(f'.SelectParameter("{name}", True)')
             optimizer.append(f'.SetParameterInit({val})')
-            if name == "pin_dis":
-                optimizer.append('.SetParameterMin({:.2f})'.format(0.5))
-                optimizer.append('.SetParameterMax({:.2f})'.format(feedx-self.block_len-PATCH_OFFSET)) 
-            elif name == "patch_len":
-                optimizer.append('.SetParameterMin({:.2f})'.format(feedx-self.block_len+0.5))
-                optimizer.append('.SetParameterMax({:.2f})'.format(REGIONX-PATCH_OFFSET)) 
-            elif name == "pin_width":
-                optimizer.append('.SetParameterMin({:.2f})'.format(LINE))
-                optimizer.append('.SetParameterMax({:.2f})'.format(REGIONY-LINE-PATCH_OFFSET)) 
+            if name == "L":
+                optimizer.append('.SetParameterMin({:.2f})'.format(1))
+                optimizer.append('.SetParameterMax({:.2f})'.format(REGIONX-feedx)) 
+            elif name == "D":
+                optimizer.append('.SetParameterMin({:.2f})'.format(1))
+                optimizer.append('.SetParameterMax({:.2f})'.format(feedx))
+            elif name == "H":
+                optimizer.append('.SetParameterMin({:.2f})'.format(1))
+                optimizer.append('.SetParameterMax({:.2f})'.format(REGIONY))
+            elif name == "W":
+                optimizer.append('.SetParameterMin({:.2f})'.format(0.2))
+                optimizer.append('.SetParameterMax({:.2f})'.format(3)) 
         optimizer.append('.DeleteAllGoals')
         goal = ['Dim gid As Integer', 'gid = .AddGoal("1DC Primary Result")', '.SelectGoal(gid, True)', 
                 '.SetGoal1DCResultName(".\\S-Parameters\\S1,1")', '.SetGoalScalarType("magdB20")', 
