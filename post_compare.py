@@ -5,7 +5,7 @@ import csv
 import pandas as pd
 import time
 from pifa_controller import MLPIFA
-from settings import INIT_P1, INIT_P2, INIT_P3
+from settings import*
 
 if __name__ == "__main__":
     os.makedirs("data/s11", exist_ok=True)
@@ -19,16 +19,17 @@ if __name__ == "__main__":
 
 for index in range(len(predicted_data)): # Loop through all n samples and run CST optimizer
         mlpifa.delete_results() # clear legacy
-        input_seq = list(predicted_data[index, :10])
+        input_seq = list(predicted_data[index, :BLOCKS_NUM+1])
         print(f"\nSample{index} optimizing...")
         # Update feedx and blocks material
         feedx = input_seq[0]
         mlpifa.create_parameters('fx', feedx) # update fx
         mlpifa.update_distribution(input_seq[1:]) # ignore fx in the first index and update blocks material
+        err = feedx - (FEEDX_MIN+FEEDX_MAX)/2
 
         # Without optimization
         # Update parameters # post
-        mlpifa.parameters = {"pin_dis":INIT_P1, "patch_len":INIT_P2, "pin_width":INIT_P3} # post
+        mlpifa.parameters = {'L':L-err, 'D': D+err, 'H': H, 'W': W} # post
         for key, value in mlpifa.parameters.items(): # post
              print(f"key: {key}; value: {value}") # post
              mlpifa.create_parameters(key, value) # post
@@ -40,8 +41,8 @@ for index in range(len(predicted_data)): # Loop through all n samples and run CS
         s11 = mlpifa.read('1D Results\\S-Parameters\\S1,1') # [freq, s11 50+j,...]
         s11 = np.abs(np.array(s11))
         s11[:,1] = 20*np.log10(s11[:,1]) # change s11 to dB
-        data = pd.DataFrame(s11[:,:-1], columns=['freq', 's11']) # create a DataFrame
-        data.to_csv(f'data/s11/s{index}.csv', index=False) # save to CSV
+        data1 = pd.DataFrame(s11[:,:-1], columns=['freq', 's11']) # create a DataFrame
+        data1.to_csv(f'data/s11/s{index}.csv', index=False) # save to CSV
         print(f"S11 saved to 'data/s11/s{index}.csv'")
         # Store data into data.csv for further inspection # post
         data1 = input_seq
@@ -56,10 +57,8 @@ for index in range(len(predicted_data)): # Loop through all n samples and run CS
 
         # Optimized by ML model
         # Update parameters # post
-        pre_para = list(predicted_data[index, 10:13]) # post
-        mlpifa.parameters = {"pin_dis":pre_para[0], \
-                             "patch_len":pre_para[1], \
-                                "pin_width":pre_para[2]} # post
+        pre_para = list(predicted_data[index, BLOCKS_NUM+1:]) # post
+        mlpifa.parameters = {"L":pre_para[0],"D":pre_para[1],"H":pre_para[2],"W":pre_para[3]} # post
         for key, value in mlpifa.parameters.items(): # post
              print(f"key: {key}; value: {value}") # post
              mlpifa.create_parameters(key, value) # post
@@ -71,8 +70,8 @@ for index in range(len(predicted_data)): # Loop through all n samples and run CS
         s11 = mlpifa.read('1D Results\\S-Parameters\\S1,1') # [freq, s11 50+j,...]
         s11 = np.abs(np.array(s11))
         s11[:,1] = 20*np.log10(s11[:,1]) # change s11 to dB
-        data = pd.DataFrame(s11[:,:-1], columns=['freq', 's11']) # create a DataFrame
-        data.to_csv(f'data/s11/m{index}.csv', index=False) # save to CSV
+        data2 = pd.DataFrame(s11[:,:-1], columns=['freq', 's11']) # create a DataFrame
+        data2.to_csv(f'data/s11/m{index}.csv', index=False) # save to CSV
         print(f"S11 saved to 'data/s11/m{index}.csv'")
         # Store data into data.csv for further inspection # post
         data2 = input_seq
@@ -88,7 +87,7 @@ for index in range(len(predicted_data)): # Loop through all n samples and run CS
         # Optimized by CST
         mlpifa.set_port()
         start_time = time.time()
-        mlpifa.parameters = {"pin_dis":INIT_P1, "patch_len":INIT_P2, "pin_width":INIT_P3} # altered to make optimizer start with these values
+        mlpifa.parameters = {'L':L-err, 'D': D+err, 'H': H, 'W': W} # altered to make optimizer start with these values
         mlpifa.optimize(feedx) # run CST optimizer
         end_time = time.time()
         print("optimization time =", end_time-start_time)
@@ -97,8 +96,8 @@ for index in range(len(predicted_data)): # Loop through all n samples and run CS
         s11 = mlpifa.read('1D Results\\S-Parameters\\S1,1') # [freq, s11 50+j,...]
         s11 = np.abs(np.array(s11))
         s11[:,1] = 20*np.log10(s11[:,1]) # change s11 to dB
-        data = pd.DataFrame(s11[:,:-1], columns=['freq', 's11']) # create a DataFrame
-        data.to_csv(f'data/s11/o{index}.csv', index=False) # save to CSV
+        data3 = pd.DataFrame(s11[:,:-1], columns=['freq', 's11']) # create a DataFrame
+        data3.to_csv(f'data/s11/o{index}.csv', index=False) # save to CSV
         print(f"S11 saved to 'data/s11/o{index}.csv'")
         # Store data into data.csv for further inspection
         mlpifa.update_parameter_dict()
