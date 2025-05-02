@@ -3,6 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from settings import GOAL, GFMIN, GFMAX
 
+GOAL = -6
+
 data_dir = "./data/s11/"
 files = [f for f in os.listdir(data_dir) if f.startswith("s") and f.endswith(".csv")]
 files_cst = [f for f in os.listdir(data_dir) if f.startswith("o") and f.endswith(".csv")]
