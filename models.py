@@ -1,22 +1,23 @@
 import torch
 import torch.nn as nn
+from settings import BLOCKS_NUM, OUTPUT_LABELS
 
 class AntennaMLP(nn.Module):
     def __init__(self):
         super(AntennaMLP, self).__init__()
         self.net = nn.Sequential(
-            nn.Linear(10, 64),
+            nn.Linear(BLOCKS_NUM+1, 64),
             nn.ReLU(),
             nn.Linear(64, 64),
             nn.ReLU(),
-            nn.Linear(64, 3),
+            nn.Linear(64, len(OUTPUT_LABELS)),
         )
 
     def forward(self, x):
         return self.net(x)
 
 class FeedbackGRUModel(nn.Module):
-    def __init__(self, input_dim=10, output_dim=3, hidden_dim=128, num_iterations=5):
+    def __init__(self, input_dim=BLOCKS_NUM+1, output_dim=len(OUTPUT_LABELS), hidden_dim=128, num_iterations=5):
         super().__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
