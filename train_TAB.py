@@ -10,7 +10,7 @@ from tab_transformer_pytorch import TabTransformer
 from torch.utils.data import DataLoader, TensorDataset
 import os
 import pickle
-from settings import FEEDX_MAX, FEEDX_MIN, BLOCKS_NUM
+from settings import FEEDX_MAX, FEEDX_MIN, BLOCKS_NUM, OUTPUT_LABELS
 
 FOLDER = "artifacts_TAB"
 os.makedirs(FOLDER, exist_ok=True)
@@ -21,8 +21,8 @@ print(f"Using {device} device")
 
 # Load dataset
 data = pd.read_csv('data/data.csv').values
-X = data[:, :10]
-y = data[:, 10:13]
+X = data[:, :BLOCKS_NUM+1]
+y = data[:, BLOCKS_NUM+1:]
 
 # Normalize inputs and outputs separately
 x_scaler = MinMaxScaler()
@@ -42,7 +42,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 # Convert to torch tensors and move to device
 y_train_tensor = torch.FloatTensor(y_train).to(device)
 y_test_tensor = torch.FloatTensor(y_test).to(device)
-categorical_columns = list(range(1, 10))
+categorical_columns = list(range(1, BLOCKS_NUM+1))
 continuous_columns = [0]
 X_train_cat = X_train[:, categorical_columns].astype(int)
 X_test_cat = X_test[:, categorical_columns].astype(int)
@@ -55,10 +55,10 @@ X_test_cont_tensor = torch.FloatTensor(X_test_cont).to(device)
 
 # Model
 model = TabTransformer(
-            categories=[2] * 9,
+            categories=[2] * BLOCKS_NUM,
             num_continuous=1,
             dim=64,
-            dim_out=3,
+            dim_out=len(OUTPUT_LABELS),
             depth=3,
             heads=4,
             attn_dropout=0.1,
@@ -145,15 +145,14 @@ preds = y_scaler.inverse_transform(preds)
 y_true = y_scaler.inverse_transform(y_true)
 
 # === Plot each output ===
-output_labels = ['D', 'L', 'W'] # pin_dis, patch_len, pin_width
-for i in range(3):
+for i in range(len(OUTPUT_LABELS)):
     plt.figure(figsize=(6, 5))
     plt.scatter(y_true[:, i], preds[:, i], alpha=0.6)
     plt.plot([y_true[:, i].min(), y_true[:, i].max()],
              [y_true[:, i].min(), y_true[:, i].max()], 'r--')
     plt.xlabel('True Value')
     plt.ylabel('Predicted Value')
-    plt.title(f'{output_labels[i]}: Predicted vs True')
+    plt.title(f'{OUTPUT_LABELS[i]}: Predicted vs True')
     plt.grid(True)
     plt.tight_layout()
     plt.savefig(f'{FOLDER}/output_{i+1}_plot.png')
@@ -183,7 +182,7 @@ x_scaler = pickle.load(open(f"{FOLDER}/x_scaler.pkl", "rb"))
 y_scaler = pickle.load(open(f"{FOLDER}/y_scaler.pkl", "rb"))
 X_test = x_scaler.transform(X)
 
-categorical_columns = list(range(1, 10))
+categorical_columns = list(range(1, BLOCKS_NUM+1))
 continuous_columns = [0]
 X_test_cat = X_test[:, categorical_columns].astype(int)
 X_test_cont = X_test[:, continuous_columns]
