@@ -9,7 +9,7 @@ from sklearn.preprocessing import MinMaxScaler
 from models import FeedbackGRUModel
 import os
 import pickle
-from settings import FEEDX_MAX, FEEDX_MIN, BLOCKS_NUM
+from settings import FEEDX_MAX, FEEDX_MIN, BLOCKS_NUM, OUTPUT_LABELS
 
 FOLDER = "artifacts_RNN"
 os.makedirs(FOLDER, exist_ok=True)
@@ -20,8 +20,8 @@ print(f"Using {device} device")
 
 # Load dataset
 data = pd.read_csv('data/data.csv').values
-X = data[:, :10]
-y = data[:, 10:13]
+X = data[:, :BLOCKS_NUM+1]
+y = data[:, BLOCKS_NUM+1:]
 
 # Normalize inputs and outputs separately
 x_scaler = MinMaxScaler()
@@ -44,20 +44,7 @@ y_test = torch.tensor(y_test, dtype=torch.float32).to(device)
 
 # Model, Loss, Optimizer
 model = FeedbackGRUModel().to(device)
-
-# Define per-output weights (e.g., [D, L, W])
-output_weights = torch.tensor([1.0, 1.0, 1.0]).to(device)  # Adjustable
-
-class WeightedMSELoss(nn.Module):
-    def __init__(self, weights):
-        super(WeightedMSELoss, self).__init__()
-        self.weights = weights
-
-    def forward(self, preds, targets):
-        loss = self.weights * (preds - targets) ** 2
-        return loss.mean()
-
-criterion = WeightedMSELoss(output_weights)
+criterion = nn.MSELoss()
 optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
 # Early stopping settings
@@ -129,15 +116,14 @@ preds = y_scaler.inverse_transform(preds)
 y_true = y_scaler.inverse_transform(y_true)
 
 # === Plot each output ===
-output_labels = ['D', 'L', 'W'] # pin_dis, patch_len, pin_width
-for i in range(3):
+for i in range(len(OUTPUT_LABELS)):
     plt.figure(figsize=(6, 5))
     plt.scatter(y_true[:, i], preds[:, i], alpha=0.6)
     plt.plot([y_true[:, i].min(), y_true[:, i].max()],
              [y_true[:, i].min(), y_true[:, i].max()], 'r--')
     plt.xlabel('True Value')
     plt.ylabel('Predicted Value')
-    plt.title(f'{output_labels[i]}: Predicted vs True')
+    plt.title(f'{OUTPUT_LABELS[i]}: Predicted vs True')
     plt.grid(True)
     plt.tight_layout()
     plt.savefig(f'{FOLDER}/output_{i+1}_plot.png')
@@ -150,6 +136,7 @@ with open(f"{FOLDER}/test_loss.txt", "w") as f:
     f.write(f"MSE on test set: {mse:.6f}\n")
 
 print(f"Test MSE: {mse:.6f}")
+
 
 # === Output 5 predictions ===
 def generate_input():
