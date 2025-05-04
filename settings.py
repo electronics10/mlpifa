@@ -15,6 +15,7 @@ L = 11.9
 D = 5.9
 H = 8.9
 W = 0.2
+OUTPUT_LABELS = ['L', 'D', 'H', 'W']
 
 FMIN = 2 # GHz
 FMAX = 3 # GHz
