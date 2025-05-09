@@ -44,7 +44,20 @@ y_test = torch.tensor(y_test, dtype=torch.float32).to(device)
 
 # Model, Loss, Optimizer
 model = AntennaMLP().to(device)
-criterion = nn.MSELoss()
+
+# Define per-output weights (e.g., [D, L, W])
+output_weights = torch.tensor([1.0, 1.0, 1.0, 1.0]).to(device)  # Adjustable
+
+class WeightedMSELoss(nn.Module):
+    def __init__(self, weights):
+        super(WeightedMSELoss, self).__init__()
+        self.weights = weights
+
+    def forward(self, preds, targets):
+        loss = self.weights * (preds - targets) ** 2
+        return loss.mean()
+
+criterion = WeightedMSELoss(output_weights)
 optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
 # Early stopping settings
