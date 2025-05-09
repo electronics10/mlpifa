@@ -11,7 +11,7 @@ import os
 import pickle
 from settings import FEEDX_MAX, FEEDX_MIN, BLOCKS_NUM, OUTPUT_LABELS
 
-FOLDER = "artifacts_FNN"
+FOLDER = "artifacts_weighted"
 os.makedirs(FOLDER, exist_ok=True)
 
 # Device configuration
