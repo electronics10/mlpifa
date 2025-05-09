@@ -11,7 +11,7 @@ BOUND = -1 # dB
 df = pd.read_csv("data/data.csv", header=None)
 output_file = "data/data_filtered.csv"
 
-for index in range(5):#len(df)):
+for index in range(len(df)):
     # Read s11_{index}
     df_s11 = pd.read_csv(f"data/s11/s11_{index}.csv")
     j = 0
