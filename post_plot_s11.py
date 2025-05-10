@@ -5,7 +5,7 @@ from settings import GOAL, GFMIN, GFMAX
 
 GOAL = -6
 
-data_dir = "./data/s11/"
+data_dir = "./data/comparison/"
 files = [f for f in os.listdir(data_dir) if f.startswith("i") and f.endswith(".csv")]
 files_cst = [f for f in os.listdir(data_dir) if f.startswith("o") and f.endswith(".csv")]
 files_ml = [f for f in os.listdir(data_dir) if f.startswith("m") and f.endswith(".csv")]
@@ -38,6 +38,6 @@ def parse(case, ran):
     plt.title(f"Comparison{case}")
     plt.legend()
     plt.grid()
-    plt.savefig(f'comparison{case}.png')
+    plt.savefig(f'data/comparison/comparison{case}.png')
 
 for case in range(len(files)): parse(case, 1)
