@@ -1,5 +1,6 @@
 from settings import BLOCKS_NUM, REGIONX, REGIONY
 import pandas as pd
+import os
 
 os.makedirs("data/comparison", exist_ok=True)
 filePath = 'data/comparison/post_prediction.csv'
