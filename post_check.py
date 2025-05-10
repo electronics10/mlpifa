@@ -1,8 +1,8 @@
 from settings import BLOCKS_NUM, REGIONX, REGIONY
 import pandas as pd
 
-
-filePath = 'data/post_prediction.csv'
+os.makedirs("data/comparison", exist_ok=True)
+filePath = 'data/comparison/post_prediction.csv'
 df = pd.read_csv(filePath, header=None)
 
 for case in range(len(df)):
