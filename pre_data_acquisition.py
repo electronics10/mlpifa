@@ -44,13 +44,13 @@ for index in range(iter_start, len(input_data)): # Loop through all n samples an
             writer = csv.writer(csvfile)
             writer.writerow(data)
             print("Input and ouput parameters stored in data/data.csv")
-        # # Obtain optimized S11 for further inspection
-        # s11 = mlpifa.read('1D Results\\S-Parameters\\S1,1') # [freq, s11 50+j,...]
-        # s11 = np.abs(np.array(s11))
-        # s11[:,1] = 20*np.log10(s11[:,1]) # change s11 to dB
-        # data = pd.DataFrame(s11[:,:-1], columns=['freq', 's11']) # create a DataFrame
-        # data.to_csv(f'data/s11/o{index}.csv', index=False) # save to CSV
-        print(f"S11 saved to 'data/s11/o{index}.csv'")
+        # Obtain optimized S11 for further inspection
+        s11 = mlpifa.read('1D Results\\S-Parameters\\S1,1') # [freq, s11 50+j,...]
+        s11 = np.abs(np.array(s11))
+        s11[:,1] = 20*np.log10(s11[:,1]) # change s11 to dB
+        data = pd.DataFrame(s11[:,:-1], columns=['freq', 's11']) # create a DataFrame
+        data.to_csv(f'data/s11/s11_{index}.csv', index=False) # save to CSV
+        print(f"S11 saved to 'data/s11/s11_{index}.csv'")
         # Clear legacy for next iteration
         mlpifa.delete_results()
         mlpifa.delete_port() # feed postion may change in next iterationeed postion may change in next iteration
