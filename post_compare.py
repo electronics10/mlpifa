@@ -8,7 +8,7 @@ from pifa_controller import MLPIFA
 from settings import*
 
 if __name__ == "__main__":
-    os.makedirs("data/s11", exist_ok=True)
+    os.makedirs("data/comparison", exist_ok=True)
     mlpifa = MLPIFA("antennas/mlpifa.cst") # Call mlpifa file
     # mlpifa.set_environment() # set PIFA and blocks for the first call
     mlpifa.set_frequency_solver()
@@ -42,8 +42,8 @@ for index in range(len(predicted_data)): # Loop through all n samples and run CS
         s11 = np.abs(np.array(s11))
         s11[:,1] = 20*np.log10(s11[:,1]) # change s11 to dB
         data1 = pd.DataFrame(s11[:,:-1], columns=['freq', 's11']) # create a DataFrame
-        data1.to_csv(f'data/s11/i{index}.csv', index=False) # save to CSV
-        print(f"S11 saved to 'data/s11/i{index}.csv'")
+        data1.to_csv(f'data/comparison/i{index}.csv', index=False) # save to CSV
+        print(f"S11 saved to 'data/comparison/i{index}.csv'")
         # Store data into data.csv for further inspection # post
         data1 = input_seq
         for val in mlpifa.parameters.values(): data1.append(val)
@@ -71,8 +71,8 @@ for index in range(len(predicted_data)): # Loop through all n samples and run CS
         s11 = np.abs(np.array(s11))
         s11[:,1] = 20*np.log10(s11[:,1]) # change s11 to dB
         data2 = pd.DataFrame(s11[:,:-1], columns=['freq', 's11']) # create a DataFrame
-        data2.to_csv(f'data/s11/m{index}.csv', index=False) # save to CSV
-        print(f"S11 saved to 'data/s11/m{index}.csv'")
+        data2.to_csv(f'data/comparison/m{index}.csv', index=False) # save to CSV
+        print(f"S11 saved to 'data/comparison/m{index}.csv'")
         # Store data into data.csv for further inspection # post
         data2 = input_seq
         for val in mlpifa.parameters.values(): data2.append(val)
@@ -97,8 +97,8 @@ for index in range(len(predicted_data)): # Loop through all n samples and run CS
         s11 = np.abs(np.array(s11))
         s11[:,1] = 20*np.log10(s11[:,1]) # change s11 to dB
         data3 = pd.DataFrame(s11[:,:-1], columns=['freq', 's11']) # create a DataFrame
-        data3.to_csv(f'data/s11/o{index}.csv', index=False) # save to CSV
-        print(f"S11 saved to 'data/s11/o{index}.csv'")
+        data3.to_csv(f'data/comparison/o{index}.csv', index=False) # save to CSV
+        print(f"S11 saved to 'data/comparison/o{index}.csv'")
         # Store data into data.csv for further inspection
         mlpifa.update_parameter_dict()
         data3 = input_seq
