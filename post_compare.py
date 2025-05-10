@@ -47,10 +47,10 @@ for index in range(len(predicted_data)): # Loop through all n samples and run CS
         # Store data into data.csv for further inspection # post
         data1 = input_seq
         for val in mlpifa.parameters.values(): data1.append(val)
-        with open('data/data_init.csv', 'a', newline='') as csvfile:
+        with open('data/comparison/data_init.csv', 'a', newline='') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow(data1)
-            print("Input and ouput parameters stored in data/data_init.csv")
+            print("Input and ouput parameters stored in data/comparison/data_init.csv")
         # Clear legacy for optimization # post
         mlpifa.delete_results() # post
         mlpifa.delete_port() # post
@@ -76,10 +76,10 @@ for index in range(len(predicted_data)): # Loop through all n samples and run CS
         # Store data into data.csv for further inspection # post
         data2 = input_seq
         for val in mlpifa.parameters.values(): data2.append(val)
-        with open('data/data_ml.csv', 'a', newline='') as csvfile:
+        with open('data/comparison/data_ml.csv', 'a', newline='') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow(data2)
-            print("Input and ouput parameters stored in data/data_ml.csv")
+            print("Input and ouput parameters stored in data/comparison/data_ml.csv")
         # Clear legacy for optimization # post
         mlpifa.delete_results() # post
         mlpifa.delete_port() # post
@@ -103,10 +103,10 @@ for index in range(len(predicted_data)): # Loop through all n samples and run CS
         mlpifa.update_parameter_dict()
         data3 = input_seq
         for val in mlpifa.parameters.values(): data3.append(val)
-        with open('data/data_CST.csv', 'a', newline='') as csvfile:
+        with open('data/comparison/data_CST.csv', 'a', newline='') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow(data3)
-            print("Input and ouput parameters stored in data/data.csv")
+            print("Input and ouput parameters stored in data/comparison/data.csv")
         # Clear legacy for next iteration
         mlpifa.delete_results()
         mlpifa.delete_port() # feed postion may change in next iterationeed postion may change in next iteration
