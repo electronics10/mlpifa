@@ -15,6 +15,7 @@ for index in range(len(df)):
     # Read s11_{index}
     df_s11 = pd.read_csv(f"data/s11/s11_{index}.csv")
     j = 0
+    n = 0
     quality = 0
     while True:
         # Read fequency
@@ -24,9 +25,10 @@ for index in range(len(df)):
             s11 = df_s11.iloc[j, 1]
             # Record quality
             quality += GOAL - s11
+            n += 1
         if freq >= HFREQ: break
         j += 1
-    normalized_quality = quality/j
+    normalized_quality = quality/n
     if normalized_quality < BOUND: 
         with open('data/eliminated_index.csv', 'a', newline='') as csvfile:
             writer = csv.writer(csvfile)
