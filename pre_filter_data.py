@@ -26,15 +26,15 @@ for index in range(len(df)):
             quality += GOAL - s11
         if freq >= HFREQ: break
         j += 1
-    normalizer_quality = quality/j
-    if normalizer_quality < BOUND: 
+    normalized_quality = quality/j
+    if normalized_quality < BOUND: 
         with open('data/eliminated_index.csv', 'a', newline='') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow([index]) 
+            writer.writerow([index, normalized_quality]) 
     else:
         with open(output_file, 'a', newline='') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow(df.iloc[index, :])
         with open('data/saved_index.csv', 'a', newline='') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow([index])   
+            writer.writerow([index, normalized_quality])   
