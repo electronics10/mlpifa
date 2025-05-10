@@ -14,7 +14,7 @@ if __name__ == "__main__":
     mlpifa.set_frequency_solver()
 
     # Read predicted data by model # post
-    df = pd.read_csv("data/post_prediction.csv", header=None) # post
+    df = pd.read_csv("data/comparison/post_prediction.csv", header=None) # post
     predicted_data = df.iloc[:].values.astype(np.float32) # post
 
 for index in range(len(predicted_data)): # Loop through all n samples and run CST optimizer
