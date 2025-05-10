@@ -141,7 +141,7 @@ print(f"Test MSE: {mse:.6f}")
 # === Output 5 predictions ===
 def generate_input():
     np.random.seed(30)
-    samples = 5
+    samples = 15
     fx = np.random.rand(samples, 1).astype(np.float32) # generate feed x position
     fx = fx*(FEEDX_MAX - FEEDX_MIN) + FEEDX_MIN
     np.random.seed(30)
