@@ -6,7 +6,7 @@ import csv
 LFREQ = 2.4 # GHz
 HFREQ = 2.5 # GHz
 GOAL = -6 # dB
-BOUND = -1 # dB
+BOUND = -2 # dB
 
 df = pd.read_csv("data/data.csv", header=None)
 output_file = "data/data_filtered.csv"
