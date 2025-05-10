@@ -36,7 +36,7 @@ def parse(case, ran):
         df = pd.read_csv(file_path)  # Assuming headers are present in CSV
         frequency = df.iloc[:, 0]
         s11 = df.iloc[:, 1]
-        plt.plot(frequency, s11, label='Our Work (weighted)', linestyle='-', color = '#60F')
+        plt.plot(frequency, s11, label='Our Work (weighted)', linestyle='-', color = '#F00')
     plt.axvline(x = GFMIN, linestyle='-.', color = '#999')
     plt.axvline(x = GFMAX, linestyle='-.', color = '#999')
     plt.axhline(y = GOAL, linestyle='-.', color = '#999')
