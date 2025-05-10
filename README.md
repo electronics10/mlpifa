@@ -84,29 +84,28 @@ Please refer to my [main project](https://github.com/electronics10/Topology_Opti
   python pre_data_acquisition.py
   ```
 
-- For training, run the script:
+- After acquiring the data, filtered bad data samples:
+  ```
+  python pre_filter_data.py
+  ```
+
+- For training, change the the name of the filtered data `data_filtered.csv` to `data.csv` and run the script:
   ```
   conda deactivate
   conda activate mlpifa
-  python train.py
+  python train_FNN.py
   ```
-  Trained models would be saved to `./artifacts`. Training and validation loss and Prediction vs. True value figures would also be stored. 
+  Trained models would be saved to `./artifacts_FNN`. Training and validation loss and Prediction vs. True value figures would also be stored. Most importantly, we'll get a file `post_prediction.csv` for further inspection or post processing with 15 randomly genereted inputs and corresponding predictions by the trained model.
 
-- To show and compare the results of the models in post processing, consecutively run the scripts:
-  1. Generate random cases and predictions by the trained model. The prediction `post_prediction.csv` would be saved to `./data`
-     ```
-     python post_predict.py
-     ```
-  2. Compare PIFA with and without optimization by CST or our trained model by generating s11 data to `./data/s11`.
+- To show and compare the results of the models in post processing, copy `post_prediction.csv` to the folder `./data` and run the scripts:
      ```
      conda deactivate
      conda activate autotune
+     python post_check.py
      python post_compare.py
-     ```
-  3. Plot s11 comparison.
-     ```
      python post_plot_s11.py
      ```
+  `post_check.py` file is used to map the predictions to its closest upper bound satisfying the physical constraints of the design region. `post_compare.py` is used to obtain the s11 data by CST.
 ---
 
 ## Troubleshooting
