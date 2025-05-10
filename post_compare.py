@@ -42,15 +42,15 @@ for index in range(len(predicted_data)): # Loop through all n samples and run CS
         s11 = np.abs(np.array(s11))
         s11[:,1] = 20*np.log10(s11[:,1]) # change s11 to dB
         data1 = pd.DataFrame(s11[:,:-1], columns=['freq', 's11']) # create a DataFrame
-        data1.to_csv(f'data/s11/s{index}.csv', index=False) # save to CSV
-        print(f"S11 saved to 'data/s11/s{index}.csv'")
+        data1.to_csv(f'data/s11/i{index}.csv', index=False) # save to CSV
+        print(f"S11 saved to 'data/s11/i{index}.csv'")
         # Store data into data.csv for further inspection # post
         data1 = input_seq
         for val in mlpifa.parameters.values(): data1.append(val)
-        with open('data/data_wo.csv', 'a', newline='') as csvfile:
+        with open('data/data_init.csv', 'a', newline='') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow(data1)
-            print("Input and ouput parameters stored in data/data_wo.csv")
+            print("Input and ouput parameters stored in data/data_init.csv")
         # Clear legacy for optimization # post
         mlpifa.delete_results() # post
         mlpifa.delete_port() # post
