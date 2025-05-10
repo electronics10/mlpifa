@@ -11,6 +11,7 @@ if __name__ == "__main__":
     os.makedirs("./antennas", exist_ok=True)
     os.makedirs("./data", exist_ok=True)
     os.makedirs("./data/s11", exist_ok=True)
+    os.makedirs("data/comparison", exist_ok=True)
 
     mlpifa = MLPIFA("antennas/mlpifa.cst") # Call mlpifa file
     # mlpifa.set_environment() # set PIFA and blocks for the first call
