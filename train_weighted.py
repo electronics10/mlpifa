@@ -45,8 +45,8 @@ y_test = torch.tensor(y_test, dtype=torch.float32).to(device)
 # Model, Loss, Optimizer
 model = AntennaMLP().to(device)
 
-# Define per-output weights (e.g., [D, L, W])
-output_weights = torch.tensor([1.0, 3.0, 1.0, 1.0]).to(device)  # Adjustable
+# Define per-output weights (e.g., [L, D, H, W])
+output_weights = torch.tensor([1.0, 3.0, 3.0, 1.0]).to(device)  # Adjustable
 
 class WeightedMSELoss(nn.Module):
     def __init__(self, weights):
