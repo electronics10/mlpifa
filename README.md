@@ -83,7 +83,7 @@ Please refer to my [main project](https://github.com/electronics10/Topology_Opti
   conda activate autotune
   python pre_data_acquisition.py
   ```
-
+  Data is stored at `./data`
 - After acquiring the data, filtered bad data samples:
   ```
   python pre_filter_data.py
