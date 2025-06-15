@@ -16,7 +16,7 @@ data_dir = "./data/comparison/"
 
 def parse(case):
     plt.figure(figsize=(10, 5))
-    df = pd.read_csv(f"data/comparison/intial_{case}")  # Assuming headers are present in CSV
+    df = pd.read_csv(f"data/comparison/initial_{case}")  # Assuming headers are present in CSV
     frequency = df.iloc[:, 0]
     s11 = df.iloc[:, 1]
     plt.plot(frequency, s11, label='Initial', linestyle=':', color = '#000')
