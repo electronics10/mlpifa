@@ -15,7 +15,7 @@ data_dir = "./data/comparison/"
 # files_FNN_weighted = [f for f in os.listdir(data_dir) if f.startswith("weighted") and f.endswith(".csv")]
 
 def parse(case):
-    plt.figure(figsize=(10, 5)
+    plt.figure(figsize=(10, 5))
     df = pd.read_csv(f"data/comparison/intial_{case}")  # Assuming headers are present in CSV
     frequency = df.iloc[:, 0]
     s11 = df.iloc[:, 1]
