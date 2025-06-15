@@ -16,27 +16,32 @@ data_dir = "./data/comparison/"
 
 def parse(case):
     plt.figure(figsize=(10, 5))
-    df = pd.read_csv(f"data/comparison/initial_{case}")  # Assuming headers are present in CSV
+    df = pd.read_csv(f"data/comparison/initial_{case}.csv")  # Assuming headers are present in CSV
     frequency = df.iloc[:, 0]
     s11 = df.iloc[:, 1]
     plt.plot(frequency, s11, label='Initial', linestyle=':', color = '#000')
-    df = pd.read_csv(f"data/comparison/CST_{case}")  # Assuming headers are present in CSV
+    
+    df = pd.read_csv(f"data/comparison/CST_{case}.csv")  # Assuming headers are present in CSV
     frequency = df.iloc[:, 0]
     s11 = df.iloc[:, 1]
     plt.plot(frequency, s11, label='CST Optimizer', linestyle='--', color = '#4D0')
-    df = pd.read_csv(f"data/comparison/FNN_{case}")  # Assuming headers are present in CSV
+    
+    df = pd.read_csv(f"data/comparison/FNN_{case}.csv")  # Assuming headers are present in CSV
     frequency = df.iloc[:, 0]
     s11 = df.iloc[:, 1]
     plt.plot(frequency, s11, label='Our Work (FNN)', linestyle='-', color = '#00F')
-    df = pd.read_csv(f"data/comparison/weighted_{case}")  # Assuming headers are present in CSV
+    
+    df = pd.read_csv(f"data/comparison/weighted_{case}.csv")  # Assuming headers are present in CSV
     frequency = df.iloc[:, 0]
     s11 = df.iloc[:, 1]
     plt.plot(frequency, s11, label='Our Work (weighted FNN)', linestyle='-.', color = '#808')
-    df = pd.read_csv(f"data/comparison/RNN_{case}")  # Assuming headers are present in CSV
+    
+    df = pd.read_csv(f"data/comparison/RNN_{case}.csv")  # Assuming headers are present in CSV
     frequency = df.iloc[:, 0]
     s11 = df.iloc[:, 1]
     plt.plot(frequency, s11, label='Our Work (RNN)', linestyle='-.', color = '#E00')
-    df = pd.read_csv(f"data/comparison/TAB_{case}")  # Assuming headers are present in CSV
+    
+    df = pd.read_csv(f"data/comparison/TAB_{case}.csv")  # Assuming headers are present in CSV
     frequency = df.iloc[:, 0]
     s11 = df.iloc[:, 1]
     plt.plot(frequency, s11, label='Our Work (TabTransformer)', linestyle='-.', color = '#FA4')
