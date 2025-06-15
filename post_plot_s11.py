@@ -64,8 +64,8 @@ def parse(case, ran):
     plt.xlim(2, 3)
     plt.ylim(-20, 0)
     plt.xticks(np.arange(2, 3.1, 0.1))
-    plt.xlabel("Frequency")
-    plt.ylabel("S11")
+    plt.xlabel("Frequency (GHz)")
+    plt.ylabel("S11 (dB)")
     # Handle
     if case == 0: case = 1
     elif case == 1: case = 0
