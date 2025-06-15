@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 from settings import GOAL, GFMIN, GFMAX
+import numpy as np
 
 GOAL = -6
 
