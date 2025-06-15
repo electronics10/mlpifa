@@ -63,9 +63,12 @@ def parse(case, ran):
     # plt.axhline(y = GOAL, linestyle='-.', color = '#999')
     plt.xlim(2, 3)
     plt.ylim(-20, 0)
-    plt.xticks(np.arange(2, 3, 0.1))
+    plt.xticks(np.arange(2, 3.1, 0.1))
     plt.xlabel("Frequency")
     plt.ylabel("S11")
+    # Handle
+    if case == 0: case = 1
+    elif case == 1: case = 0
     plt.title(f"Case{case}")
     plt.legend()
     plt.grid()
