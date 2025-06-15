@@ -17,7 +17,7 @@ class AntennaMLP(nn.Module):
         return self.net(x)
 
 class FeedbackGRUModel(nn.Module):
-    def __init__(self, input_dim=BLOCKS_NUM+1, output_dim=len(OUTPUT_LABELS), hidden_dim=128, num_iterations=5):
+    def __init__(self, input_dim=BLOCKS_NUM+1, output_dim=len(OUTPUT_LABELS), hidden_dim=64, num_iterations=5):
         super().__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
