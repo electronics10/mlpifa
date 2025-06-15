@@ -62,7 +62,7 @@ def parse(case, ran):
     # plt.axhline(y = GOAL, linestyle='-.', color = '#999')
     plt.xlim(2, 3)
     plt.ylim(-20, 0)
-    plt.set_xticks(np.arange(2, 3, 0.1))
+    plt.xticks(np.arange(2, 3, 0.1))
     plt.xlabel("Frequency")
     plt.ylabel("S11")
     plt.title(f"Case{case}")
