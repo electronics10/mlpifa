@@ -66,9 +66,9 @@ def parse(case, ran):
     plt.xticks(np.arange(2, 3.1, 0.1))
     plt.xlabel("Frequency (GHz)")
     plt.ylabel("S11 (dB)")
-    # Handle
-    if case == 0: case = 1
-    elif case == 1: case = 0
+    # # Handle
+    # if case == 0: case = 1
+    # elif case == 1: case = 0
     plt.title(f"Case{case}")
     plt.legend()
     plt.grid()
