@@ -48,7 +48,7 @@ def parse(case, ran):
         df = pd.read_csv(file_path)  # Assuming headers are present in CSV
         frequency = df.iloc[:, 0]
         s11 = df.iloc[:, 1]
-        plt.plot(frequency, s11, label='Our Work (RNN)', linestyle='-.', color = '#B00')
+        plt.plot(frequency, s11, label='Our Work (RNN)', linestyle='-.', color = '#E00')
         
     for file in files_TAB[case:case+ran]:
         file_path = os.path.join(data_dir, file)
@@ -62,6 +62,7 @@ def parse(case, ran):
     # plt.axhline(y = GOAL, linestyle='-.', color = '#999')
     plt.xlim(2, 3)
     plt.ylim(-20, 0)
+    plt.set_xticks(np.arange(2, 3, 0.1))
     plt.xlabel("Frequency")
     plt.ylabel("S11")
     plt.title(f"Case{case}")
