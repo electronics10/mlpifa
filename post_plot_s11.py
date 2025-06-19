@@ -12,13 +12,13 @@ def parse(case):
     frequency = df.iloc[:, 0]
     s11 = df.iloc[:, 1]
     # plt.plot(frequency, s11, label='Initial', linestyle=':', color = '#000')
-    plt.plot(frequency, s11, label='Initial', linestyle='dotted', color = '#000')
+    plt.plot(frequency, s11, label='Initial', linestyle='solid', color = '#000')
     
     df = pd.read_csv(f"data/comparison/CST_{case}.csv")  # Assuming headers are present in CSV
     frequency = df.iloc[:, 0]
     s11 = df.iloc[:, 1]
     # plt.plot(frequency, s11, label='CST Optimizer', linestyle='--', color = '#4D0')
-    plt.plot(frequency, s11, label='CST Optimizer', linestyle='dotted', color = '#00F')
+    plt.plot(frequency, s11, label='CST Optimizer', linestyle='solid', color = '#00F')
     
     df = pd.read_csv(f"data/comparison/FNN_{case}.csv")  # Assuming headers are present in CSV
     frequency = df.iloc[:, 0]
