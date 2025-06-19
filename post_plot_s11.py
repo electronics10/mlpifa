@@ -30,7 +30,7 @@ def parse(case):
     frequency = df.iloc[:, 0]
     s11 = df.iloc[:, 1]
     # plt.plot(frequency, s11, label='Our Work (weighted FNN)', linestyle='-.', color = '#808')
-    plt.plot(frequency, s11, label='Our Work (FNN)', linestyle='densely dashed', color = '#F00')
+    plt.plot(frequency, s11, label='Our Work (FNN)', linestyle='dashed', color = '#F00')
     
     df = pd.read_csv(f"data/comparison/RNN_{case}.csv")  # Assuming headers are present in CSV
     frequency = df.iloc[:, 0]
