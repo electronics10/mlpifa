@@ -12,13 +12,13 @@ def parse(case):
     frequency = df.iloc[:, 0]
     s11 = df.iloc[:, 1]
     # plt.plot(frequency, s11, label='Initial', linestyle=':', color = '#000')
-    plt.plot(frequency, s11, label='Initial', linestyle='dashed', color = '#000')
+    plt.plot(frequency, s11, label='Initial', linestyle='dotted', color = '#000')
     
     df = pd.read_csv(f"data/comparison/CST_{case}.csv")  # Assuming headers are present in CSV
     frequency = df.iloc[:, 0]
     s11 = df.iloc[:, 1]
     # plt.plot(frequency, s11, label='CST Optimizer', linestyle='--', color = '#4D0')
-    plt.plot(frequency, s11, label='CST Optimizer', linestyle='dashed', color = '#00F')
+    plt.plot(frequency, s11, label='CST Optimizer', linestyle='dotted', color = '#00F')
     
     df = pd.read_csv(f"data/comparison/FNN_{case}.csv")  # Assuming headers are present in CSV
     frequency = df.iloc[:, 0]
@@ -30,13 +30,13 @@ def parse(case):
     frequency = df.iloc[:, 0]
     s11 = df.iloc[:, 1]
     # plt.plot(frequency, s11, label='Our Work (weighted FNN)', linestyle='-.', color = '#808')
-    plt.plot(frequency, s11, label='Our Work (FNN)', linestyle='densely dasheddotted', color = '#F00')
+    plt.plot(frequency, s11, label='Our Work (FNN)', linestyle='densely dashed', color = '#F00')
     
     df = pd.read_csv(f"data/comparison/RNN_{case}.csv")  # Assuming headers are present in CSV
     frequency = df.iloc[:, 0]
     s11 = df.iloc[:, 1]
     # plt.plot(frequency, s11, label='Our Work (RNN)', linestyle='-.', color = '#E00')
-    plt.plot(frequency, s11, label='Our Work (FNN)', linestyle='dashdotdotted', color = '#F00')
+    plt.plot(frequency, s11, label='Our Work (FNN)', linestyle='dashdot', color = '#F00')
     
     df = pd.read_csv(f"data/comparison/TAB_{case}.csv")  # Assuming headers are present in CSV
     frequency = df.iloc[:, 0]
