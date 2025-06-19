@@ -52,7 +52,7 @@ def parse(case):
     plt.ylim(-20, 0)
     plt.xticks(np.arange(2, 3.1, 0.1))
     plt.xlabel("Frequency (GHz)")
-    plt.ylabel("S11 (dB)")
+    plt.ylabel("|S11| (dB)")
     # Handle
     if case == 0: plt.title(f"Case{case+1}")
     elif case == 1: plt.title(f"Case{case-1}")
