@@ -12,7 +12,7 @@ def parse(case):
     frequency = df.iloc[:, 0]
     s11 = df.iloc[:, 1]
     # plt.plot(frequency, s11, label='Initial', linestyle=':', color = '#000')
-    plt.plot(frequency, s11, label='Initial', linestyle='solid', color = '#000')
+    plt.plot(frequency, s11, label='Initial', linestyle=(0, (3,1,1,1,1,1)), color = '#000')
     
     df = pd.read_csv(f"data/comparison/CST_{case}.csv")  # Assuming headers are present in CSV
     frequency = df.iloc[:, 0]
@@ -30,19 +30,19 @@ def parse(case):
     frequency = df.iloc[:, 0]
     s11 = df.iloc[:, 1]
     # plt.plot(frequency, s11, label='Our Work (weighted FNN)', linestyle='-.', color = '#808')
-    plt.plot(frequency, s11, label='Our Work (weighted FNN)', linestyle='dashed', color = '#F00')
+    plt.plot(frequency, s11, label='Our Work (weighted FNN)', linestyle=(0, (5, 10)), color = '#F00')
     
     df = pd.read_csv(f"data/comparison/RNN_{case}.csv")  # Assuming headers are present in CSV
     frequency = df.iloc[:, 0]
     s11 = df.iloc[:, 1]
     # plt.plot(frequency, s11, label='Our Work (RNN)', linestyle='-.', color = '#E00')
-    plt.plot(frequency, s11, label='Our Work (RNN)', linestyle='dashdot', color = '#F00')
+    plt.plot(frequency, s11, label='Our Work (RNN)', linestyle=(0, (3, 10, 1, 10)), color = '#F00')
     
     df = pd.read_csv(f"data/comparison/TAB_{case}.csv")  # Assuming headers are present in CSV
     frequency = df.iloc[:, 0]
     s11 = df.iloc[:, 1]
     # plt.plot(frequency, s11, label='Our Work (TabTransformer)', linestyle='-.', color = '#FA4')
-    plt.plot(frequency, s11, label='Our Work (TabTransformer)', linestyle='dotted', color = '#F00')
+    plt.plot(frequency, s11, label='Our Work (TabTransformer)', linestyle=(0, (1, 10)), color = '#F00')
 
         
     # plt.axvline(x = GFMIN, linestyle='-.', color = '#999')
