@@ -134,9 +134,9 @@ for i in range(len(OUTPUT_LABELS)):
     plt.scatter(y_true[:, i], preds[:, i], alpha=0.6)
     plt.plot([y_true[:, i].min(), y_true[:, i].max()],
              [y_true[:, i].min(), y_true[:, i].max()], 'r--')
-    plt.xlabel('True Value')
+    plt.xlabel('Target Value')
     plt.ylabel('Predicted Value')
-    plt.title(f'{OUTPUT_LABELS[i]}: Predicted vs True')
+    plt.title(f'Antenna Parameter {OUTPUT_LABELS[i]}')
     plt.grid(True, linestyle='-.', alpha=0.4)
     plt.tight_layout()
     plt.savefig(f'{FOLDER}/output_{i+1}_plot.png')
